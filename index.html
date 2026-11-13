@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Border Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1a24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Border Desk">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: night-shift checkpoint. Booth | desk of paper documents | rulebook; on phones the booth is a strip and the rulebook a drawer. */
+:root{
+  --bg:#0f1a24; --booth:#162533; --panel:#1d3042; --line:#2c4458; --text:#e7eef3; --muted:#93a8b8;
+  --lamp:#e9b44c; --approve:#3c9f6a; --deny:#d24b3c; --info:#5aa3d6;
+  --paper:#f3eedf; --paper-2:#e8e0c9; --ink:#2a2620; --ink-soft:#6b6355;
+  --display:"Big Shoulders Display",Impact,"Arial Narrow",sans-serif;
+  --sans:"IBM Plex Sans",-apple-system,system-ui,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --gutter-l:max(16px,env(safe-area-inset-left,0px)); --gutter-r:max(16px,env(safe-area-inset-right,0px));
+  color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{height:100%;background:var(--bg)}
+body{height:100%;margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--sans);overflow:hidden;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+/* .f = any field the player can tap in Inspect mode; component rules below refine it */
+.f{display:grid;gap:0;text-align:left;border:1px dashed transparent;background:none;border-radius:6px;padding:2px 4px;color:inherit;cursor:default}
+.screen{position:fixed;inset:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+
+/* ---------- iOS install gate ---------- */
+#gate{z-index:100;background:var(--bg);overflow-y:auto;padding-left:var(--gutter-l);padding-right:var(--gutter-r)}
+.gate-card{max-width:520px;margin:0 auto;padding-block:40px 120px;display:grid;gap:20px}
+.gate-card h1{font:800 40px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
+.gate-card .lead{color:var(--muted);font-size:16px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:s}
+.steps li{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;counter-increment:s}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--lamp);color:#1b1407;font:800 18px var(--display)}
+.steps b{color:#fff}
+.ios-ico{display:inline-block;vertical-align:-5px;width:22px;height:22px;margin:0 2px;color:var(--info)}
+.gate-note{color:var(--muted);font-size:13px}
+.copyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.copyrow code{font:13px var(--mono);overflow-wrap:anywhere;flex:1 1 200px;user-select:text;-webkit-user-select:text}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 16px;font-weight:600}
+.btn.primary{background:var(--lamp);border-color:var(--lamp);color:#1b1407}
+.arrow{position:fixed;z-index:101;width:44px;height:44px;color:var(--lamp);pointer-events:none}
+.arrow.down{bottom:calc(env(safe-area-inset-bottom,0px) + 8px);left:calc(50% - 22px);animation:bob 1.2s ease-in-out infinite}
+.arrow.up{top:calc(env(safe-area-inset-top,0px) + 8px);right:calc(env(safe-area-inset-right,0px) + 24px);transform:rotate(180deg);animation:bobup 1.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(8px)}}
+@keyframes bobup{0%,100%{transform:rotate(180deg)}50%{transform:rotate(180deg) translateY(8px)}}
+
+/* ---------- menu ---------- */
+#menu{overflow-y:auto;padding-left:var(--gutter-l);padding-right:var(--gutter-r);
+  background:radial-gradient(ellipse 80% 50% at 50% 0%,#24394d 0%,var(--bg) 70%)}
+.menu-in{max-width:560px;margin:0 auto;padding-block:40px;display:grid;gap:24px}
+.brand{display:grid;gap:6px}
+.brand .eyebrow{font:600 12px var(--mono);letter-spacing:.18em;color:var(--lamp);text-transform:uppercase}
+.brand h1{font:800 clamp(56px,16vw,96px)/.85 var(--display);text-transform:uppercase;letter-spacing:.01em}
+.brand p{color:var(--muted);max-width:44ch}
+.modes{display:grid;gap:12px}
+.mode{display:grid;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.mode-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mode h2{font:800 28px/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+.mode .meta{font:12px var(--mono);color:var(--muted)}
+.mode p{color:var(--muted);font-size:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip-day{min-width:56px;border:1px solid var(--line);background:var(--booth);border-radius:10px;padding:8px 10px;display:grid;gap:2px;text-align:left}
+.chip-day b{font:800 18px/1 var(--display)}
+.chip-day small{font:11px var(--mono);color:var(--muted)}
+.chip-day.new{border-color:var(--lamp)}
+.menu-foot{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- game ---------- */
+#game{display:grid;grid-template-rows:auto minmax(0,1fr) auto;padding-left:var(--gutter-l);padding-right:var(--gutter-r);gap:10px;padding-block:8px}
+.hud{display:flex;align-items:center;gap:10px;min-height:44px}
+.hud .icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;flex:none}
+.hud-day{font:800 20px/1 var(--display);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.hud-date{border:1px dashed transparent;background:none;padding:4px 6px;border-radius:6px;font:600 13px var(--mono);color:var(--lamp);white-space:nowrap}
+.hud-mid{margin-left:auto;font:600 14px var(--mono);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hud-mid.warn{color:var(--deny)}
+.hud-score{font:800 24px/1 var(--display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hud-score small{font:600 12px var(--mono);color:var(--lamp);margin-left:4px}
+.main{display:grid;grid-template-columns:230px minmax(0,1fr) 300px;gap:10px;min-height:0}
+.booth{background:linear-gradient(180deg,#203548,var(--booth));border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:hidden}
+.face-btn{border:2px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#4a6175,#2e4253);padding:0;width:100%;aspect-ratio:5/6;max-width:100%;overflow:hidden;display:block}
+.face-btn svg{width:100%;height:100%;display:block}
+.face-btn.arrive{animation:arrive .35s ease-out}
+@keyframes arrive{from{transform:translateX(-30%);opacity:0}}
+.talk{display:grid;gap:8px;min-width:0}
+.who{font:600 12px var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.speech{background:var(--paper);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:14px;position:relative;min-height:2.6em}
+.chip{justify-self:start;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font:600 12px var(--mono)}
+.desk{position:relative;min-height:0;overflow:auto;border-radius:14px;padding:12px;
+  background:repeating-linear-gradient(90deg,#3b2d22 0 2px,#43342a 2px 7px),#40312a;border:1px solid #5a4636;-webkit-overflow-scrolling:touch}
+.docs{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.book{background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.book-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.book-head h2{font:800 22px/1 var(--display);text-transform:uppercase;letter-spacing:.03em}
+.book-close{display:none}
+.book-body{overflow-y:auto;padding:12px 14px;display:grid;gap:10px;align-content:start}
+.book-body h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.rule{width:100%;text-align:left;border:1px solid var(--line);background:var(--booth);border-radius:10px;padding:10px;display:grid;gap:6px;font-size:13.5px}
+.rule.new{border-color:var(--lamp)}
+.rule .tag{font:600 10px var(--mono);color:var(--lamp);letter-spacing:.1em}
+.rule table{border-collapse:collapse;font:12px var(--mono);color:var(--muted);width:100%}
+.rule td{padding:2px 0;vertical-align:top}
+.rule td:first-child{color:var(--text);padding-right:8px;white-space:nowrap}
+.seals{display:flex;gap:10px;color:#c94a3a}
+.seals svg{width:36px;height:36px;background:var(--paper);border-radius:50%}
+.actions{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px}
+.act{min-height:56px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font:800 20px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;padding:0 14px}
+.act.deny{background:var(--deny);border-color:var(--deny);color:#fff}
+.act.approve{background:var(--approve);border-color:var(--approve);color:#fff}
+.act.on{background:var(--info);border-color:var(--info);color:#06131d}
+.act:disabled{opacity:.5}
+#btn-book{display:none}
+kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid currentColor;border-radius:4px;padding:0 3px;vertical-align:2px}
+
+/* documents */
+.doc{width:290px;max-width:100%;background:var(--paper);color:var(--ink);border-radius:8px;box-shadow:0 6px 0 rgba(0,0,0,.25),0 12px 24px rgba(0,0,0,.25);overflow:hidden;flex:none}
+.doc header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;font:600 11px var(--mono);letter-spacing:.12em;background:var(--cover,#5f5546);color:#f6f0e0}
+.doc header b{font:800 16px/1 var(--display);letter-spacing:.08em}
+.doc .body{padding:10px 12px;display:grid;gap:4px}
+.pp-body{display:grid;grid-template-columns:86px 1fr;gap:10px;padding:10px 12px}
+.photo{border:1px solid #b9ae94;border-radius:4px;padding:0;background:#c9d3d8;aspect-ratio:5/6;align-self:start;overflow:hidden}
+.photo svg{display:block;width:100%;height:100%}
+.f .lbl{font:600 9.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.f .val{font:600 14px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.doc.ticket{background:#e9f0e4}.doc.ticket header{background:#3e6b4f}
+.doc.work{background:#eef0f6}.doc.work header{background:#3c4f7c}
+.doc.vaccine{background:#f6ece8}.doc.vaccine header{background:#8a3d33}
+.doc.idcard{background:#efeadc}.doc.idcard header{background:#2f5d50}
+.work-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.seal-btn{color:#b4392b;width:58px;height:58px;padding:2px;border-radius:50%}
+.seal-btn svg{width:100%;height:100%}
+.dates-strip{height:6px;background:repeating-linear-gradient(90deg,var(--cover,#5f5546) 0 8px,transparent 8px 12px);opacity:.5}
+
+/* inspect mode */
+body.inspecting .f{cursor:pointer;border-color:rgba(90,163,214,.55)}
+body.inspecting .booth .f,body.inspecting .book .f,body.inspecting .hud .f{border-color:rgba(90,163,214,.55)}
+.f.sel,.rule.sel,.face-btn.sel{border-color:var(--info)!important;border-style:solid!important;box-shadow:0 0 0 3px rgba(90,163,214,.45)}
+.inspect-bar{position:sticky;top:0;z-index:3;margin:-12px -12px 12px;padding:8px 12px;background:var(--info);color:#06131d;font:600 13px var(--sans)}
+
+/* stamp + toast */
+.stamp{position:fixed;left:50%;top:45%;z-index:20;transform:translate(-50%,-50%) rotate(-12deg);font:800 clamp(34px,9vw,64px)/1 var(--display);letter-spacing:.06em;
+  padding:10px 22px;border:6px solid currentColor;border-radius:10px;text-transform:uppercase;background:rgba(243,238,223,.92);pointer-events:none;animation:stampin .28s cubic-bezier(.2,1.6,.4,1)}
+.stamp.ok{color:var(--approve)}.stamp.no{color:var(--deny)}
+@keyframes stampin{from{transform:translate(-50%,-50%) rotate(-12deg) scale(1.8);opacity:0}}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 64px);transform:translateX(-50%);z-index:30;max-width:min(92vw,460px);
+  padding:10px 16px;border-radius:12px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);text-align:center}
+.toast.good{background:var(--approve);color:#fff}.toast.bad{background:var(--deny);color:#fff}.toast.info{background:var(--info);color:#06131d}
+
+/* overlays */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(6,12,18,.78);display:grid;place-items:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) var(--gutter-r) max(16px,env(safe-area-inset-bottom,0px)) var(--gutter-l);overflow-y:auto}
+.card{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:14px}
+.card h2{font:800 32px/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+.card p{color:var(--muted)}
+.card .speaker{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--lamp)}
+.card .line{font-size:18px;color:var(--text)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stat{background:var(--booth);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:2px}
+.stat b{font:800 28px/1 var(--display);font-variant-numeric:tabular-nums}
+.stat small{font:11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.howto ol{margin:0;padding-left:20px;display:grid;gap:8px;color:var(--text)}
+.choices{display:grid;gap:8px}
+
+/* ---------- phones / narrow ---------- */
+@media (max-width:899px){
+  .main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .booth{flex-direction:row;padding:10px;align-items:stretch}
+  .face-btn{width:84px;flex:none;align-self:start}
+  .talk{flex:1}
+  .speech{font-size:13.5px}
+  .docs{flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:12px;margin:-4px;padding:4px 4px 14px}
+  .doc{width:min(320px,82vw);scroll-snap-align:center}
+  .book{position:fixed;left:0;right:0;bottom:0;z-index:40;max-height:78%;border-radius:16px 16px 0 0;
+    padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+    transform:translateY(105%);transition:transform .25s ease;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+  .book.open{transform:none}
+  .book-close{display:block}
+  #btn-book{display:block}
+  .actions{grid-template-columns:auto auto 1fr 1fr}
+  .act{font-size:18px;padding:0 10px}
+  .hud-day{font-size:17px}
+  kbd{display:none}
+}
+@media (max-width:420px){.hud-date{display:none}.hud{gap:8px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<!-- ============ iOS install gate ============ -->
+<section id="gate" class="screen" hidden>
+  <div class="gate-card">
+    <div class="brand"><span class="eyebrow">Border Desk</span></div>
+    <h1>Add to Home Screen to play</h1>
+    <p class="lead" id="gate-lead">On iPhone and iPad, Border Desk runs as an app from your Home Screen. It takes about 20 seconds.</p>
+    <ol class="steps" id="gate-steps"></ol>
+    <div class="copyrow" id="gate-copy" hidden><code id="gate-url"></code><button class="btn" id="gate-copy-btn" type="button">Copy link</button></div>
+    <p class="gate-note" id="gate-note"></p>
+  </div>
+  <svg class="arrow" id="gate-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v15m0 0-6-6m6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</section>
+
+<!-- ============ menu ============ -->
+<section id="menu" class="screen" hidden>
+  <div class="menu-in">
+    <div class="brand">
+      <span class="eyebrow">Veldmark · Eastern Checkpoint</span>
+      <h1>Border<br>Desk</h1>
+      <p>Check the papers. Compare them with today's rules. Stamp approve or deny, and try not to collect citations.</p>
+    </div>
+    <div class="modes">
+      <div class="mode">
+        <div class="mode-head"><h2>Story</h2><span class="meta" id="story-meta">10 days</span></div>
+        <p>Your first ten days at the checkpoint. Regulars, a reporter, a smuggler with a fat wallet, and choices that decide how it ends.</p>
+        <div class="row" id="story-btns"></div>
+      </div>
+      <div class="mode">
+        <div class="mode-head"><h2>Arcade</h2><span class="meta">3-minute shifts</span></div>
+        <p>Every day adds a rule. Build a streak for a score multiplier. Finish a shift to unlock the next day.</p>
+        <div class="chips" id="arcade-days"></div>
+      </div>
+      <div class="mode">
+        <div class="mode-head"><h2>Endless</h2><span class="meta" id="endless-meta">Best: 0</span></div>
+        <p>Every rule at once, and it only gets harder. Three mistakes and you're done.</p>
+        <div class="row"><button class="btn primary" id="btn-endless" type="button">Start endless</button></div>
+      </div>
+    </div>
+    <div class="menu-foot">
+      <button class="btn" id="btn-howto" type="button">How to play</button>
+      <button class="btn" id="btn-sound" type="button">Sound: on</button>
+      <button class="btn" id="btn-install" type="button" hidden>Install app</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ game ============ -->
+<section id="game" class="screen" hidden>
+  <header class="hud">
+    <button class="icon-btn" id="btn-pause" type="button" aria-label="Pause"><svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="currentColor"/></svg></button>
+    <div class="hud-day" id="hud-day">Day 1</div>
+    <button class="f hud-date" type="button" data-key="desk.date" id="hud-date" aria-label="Today's date"></button>
+    <div class="hud-mid" id="hud-mid"></div>
+    <div class="hud-score"><span id="hud-score">0</span><small id="hud-mult"></small></div>
+  </header>
+  <div class="main">
+    <section class="booth" aria-label="Traveler">
+      <button class="f face-btn" type="button" data-key="booth.face" id="face" aria-label="The traveler's face"></button>
+      <div class="talk">
+        <div class="who" id="who">Traveler</div>
+        <p class="speech" id="speech" aria-live="polite"></p>
+        <button class="f chip" type="button" data-key="booth.purpose" id="purpose"></button>
+      </div>
+    </section>
+    <section class="desk" id="desk" aria-label="Documents">
+      <div class="inspect-bar" id="inspect-bar" hidden>Inspect: tap two things that don't agree.</div>
+      <div class="docs" id="docs"></div>
+    </section>
+    <aside class="book" id="book" aria-label="Rulebook">
+      <div class="book-head"><h2>Rulebook</h2><button class="btn book-close" id="book-close" type="button">Close</button></div>
+      <div class="book-body" id="book-body"></div>
+    </aside>
+  </div>
+  <footer class="actions">
+    <button class="act" id="btn-inspect" type="button">Inspect<kbd>I</kbd></button>
+    <button class="act" id="btn-book" type="button">Rules</button>
+    <button class="act deny" id="btn-deny" type="button">Deny<kbd>D</kbd></button>
+    <button class="act approve" id="btn-approve" type="button">Approve<kbd>A</kbd></button>
+  </footer>
+</section>
+
+<div class="stamp" id="stamp" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="overlay" id="overlay" hidden><div class="card" id="overlay-card"></div></div>
+
+<!-- ============ engine (no DOM; tested by tests/engine.test.js) ============ -->
+<script id="engine">
+(function(G){
+'use strict';
+const MS=86400000, EPOCH=Date.UTC(2031,3,2);
+const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtDate(d){const x=new Date(EPOCH+(d-1)*MS);return String(x.getUTCDate()).padStart(2,'0')+' '+MONTHS[x.getUTCMonth()]+' '+x.getUTCFullYear();}
+function rng(seed){let a=seed>>>0;const f=()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+  return{f,int:(lo,hi)=>lo+Math.floor(f()*(hi-lo+1)),pick:a=>a[Math.floor(f()*a.length)],chance:p=>f()<p,
+    shuffle:a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(f()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}};}
+
+const HOME='Veldmark';
+const COUNTRIES={Veldmark:['Brask','Ollen','Vey'],Corvel:['Tamsk','Ury'],Ostrand:['Halde','Brinn'],Pelagia:['Mirel','Caspa'],Tirrin:['Dunmor','Keth'],Lumeno:['Avra','Solenne'],Zemora:['Koba','Rist']};
+const CODES={Veldmark:'VK',Corvel:'CV',Ostrand:'OS',Pelagia:'PG',Tirrin:'TR',Lumeno:'LM',Zemora:'ZM'};
+const FOREIGN=Object.keys(COUNTRIES).filter(c=>c!==HOME);
+const FIRST=['Anja','Bors','Celia','Dmitar','Edda','Feliks','Greta','Hanno','Ilse','Jonas','Katya','Lev','Mira','Nils','Olga','Pavo','Rada','Sven','Tamsin','Ugo','Vera','Wim','Yara','Zoltan','Ada','Emil','Lina','Oskar','Rhea','Teo'];
+const LAST=['Albrecht','Borisov','Corran','Dahl','Ekberg','Falk','Grosz','Halloran','Ivanic','Jansen','Kral','Lindqvist','Moravec','Novak','Orsini','Petrak','Quist','Rusk','Sorel','Tamas','Ulven','Varga','Weiss','Yelin','Zoric','Brandt','Kessler','Marek','Sato','Voss'];
+const DISTRICTS=['North Ward','Riverside','Old Quarter','Harbor'];
+const BAD_DISTRICTS=['Lowmarsh','East Gate','Pinecross'];
+const SEALS=['sun','tower','wave'], BAD_SEALS=['crown','key','moon'];
+const RULES=[
+  {id:'expiry',day:1,text:'Passports must not be expired.'},
+  {id:'photo',day:1,text:'The passport photo must match the traveler.'},
+  {id:'city',day:2,text:'The issuing city must belong to the passport country.'},
+  {id:'ticket',day:3,text:'Foreigners need an entry ticket valid on today’s date.'},
+  {id:'names',day:3,text:'The name on every document must match the passport.'},
+  {id:'workpass',day:4,text:'Foreign workers need a work pass with their passport number.'},
+  {id:'seal',day:5,text:'Work passes need a valid Ministry seal.'},
+  {id:'banned',day:6,text:'Deny every traveler from the closed country.'},
+  {id:'vaccine',day:7,text:'Travelers from listed countries need a Grayfever vaccine slip with their passport number.'},
+  {id:'idcard',day:8,text:'Citizens need an ID card from a valid district with the same date of birth.'}
+];
+const LINES={
+  visit:['Just visiting family.','A short holiday, nothing more.','I’m here to see the coast.','Visiting a friend in Ollen.','My sister is getting married.'],
+  work:['I start a job in Brask on Monday.','Seasonal work at the harbor.','Contract work. I’m an engineer.','The mill in Vey hired me.'],
+  return:['Coming home.','Back from a trip. Long queue today.','Home at last.','Good evening, officer.']
+};
+const FACE_KEYS=['skin','hair','hc','eyes','glasses','beard','shape'];
+function randFace(r){return{skin:r.int(0,4),hair:r.int(0,5),hc:r.int(0,4),eyes:r.int(0,2),glasses:r.chance(.25),beard:r.chance(.25),shape:r.int(0,2),shirt:r.int(0,4)};}
+function sameFace(a,b){return FACE_KEYS.every(k=>a[k]===b[k]);}
+function mutateFace(f,r){const g=Object.assign({},f);const k=r.pick(['hair','glasses','beard','shape']);
+  if(k==='glasses'||k==='beard')g[k]=!g[k];else{const n=k==='hair'?6:3;g[k]=(g[k]+r.int(1,n-1))%n;}return g;}
+function alterName(name,r,subtle){const sp=name.split(' ');const first=sp[0],last=sp.slice(1).join(' ');
+  if(subtle||r.chance(.5)){const V='aeiou';const idx=[...last].map((ch,i)=>V.includes(ch)?i:-1).filter(i=>i>=0);
+    if(idx.length){const i=r.pick(idx);const nv=r.pick(V.replace(last[i],'').split(''));return first+' '+last.slice(0,i)+nv+last.slice(i+1);}}
+  let l;do{l=r.pick(LAST);}while(l===last);return first+' '+l;}
+function alterNumber(num,r){const p=num.slice(0,3),n=num.slice(3);const i=r.int(0,n.length-1);return p+n.slice(0,i)+String((+n[i]+r.int(1,9))%10)+n.slice(i+1);}
+const foreign=t=>t.docs.passport.country!==HOME;
+function setCountry(t,country,r){const pp=t.docs.passport;pp.country=country;pp.city=r.pick(COUNTRIES[country]);pp.number=CODES[country]+'-'+r.int(10000,99999);
+  t.country=country;if(t.docs.work)t.docs.work.number=pp.number;if(t.docs.vaccine)t.docs.vaccine.number=pp.number;}
+const I=(rule,text,fields,say)=>({rule,text,fields,say});
+
+const CHECK={
+  expiry:(t,c)=>t.docs.passport.expiry<c.today?I('expiry','The passport is expired.',['passport.expiry','desk.date'],'Expired? I was sure I renewed it.'):null,
+  photo:(t)=>!sameFace(t.docs.passport.face,t.face)?I('photo','The photo doesn’t match the traveler.',['passport.photo','booth.face'],'I… changed my look. It’s still me.'):null,
+  city:(t)=>{const p=t.docs.passport;return COUNTRIES[p.country].includes(p.city)?null:I('city','The issuing city isn’t in that country.',['passport.city','rule.city'],'That’s where they printed it, I swear.');},
+  ticket:(t,c)=>{if(!foreign(t))return null;const d=t.docs;
+    if(!d.ticket)return I('ticket','No entry ticket.',['rule.ticket','passport.country'],'The ticket office was closed!');
+    if(d.ticket.date!==c.today)return I('ticket','The entry ticket is for a different day.',['ticket.date','desk.date'],'I bought it for the wrong day?');return null;},
+  names:(t)=>{const d=t.docs;for(const k of ['ticket','work','vaccine','id'])if(d[k]&&d[k].name!==d.passport.name)
+    return I('names','A name doesn’t match the passport.',[k+'.name','passport.name'],'A clerk must have misspelled it.');return null;},
+  workpass:(t)=>{if(!foreign(t)||t.purpose!=='work')return null;const d=t.docs;
+    if(!d.work)return I('workpass','A foreign worker without a work pass.',['rule.workpass','booth.purpose'],'My employer said I didn’t need one.');
+    if(d.work.number!==d.passport.number)return I('workpass','The work pass has a different passport number.',['work.number','passport.number'],'They must have typed it wrong.');return null;},
+  seal:(t)=>t.docs.work&&!SEALS.includes(t.docs.work.seal)?I('seal','The work pass seal is fake.',['work.seal','rule.seal'],'It’s the seal they gave me!'):null,
+  banned:(t,c)=>c.banned&&t.docs.passport.country===c.banned?I('banned','That country is closed today.',['passport.country','rule.banned'],'Nobody told me the border was closed.'):null,
+  vaccine:(t,c)=>{const d=t.docs;if(!c.vaccine.includes(d.passport.country))return null;
+    if(!d.vaccine)return I('vaccine','No vaccine slip.',['rule.vaccine','passport.country'],'I’m not sick. Look at me.');
+    if(d.vaccine.number!==d.passport.number)return I('vaccine','The vaccine slip has a different passport number.',['vaccine.number','passport.number'],'That’s my slip, really.');return null;},
+  idcard:(t)=>{if(foreign(t))return null;const d=t.docs;
+    if(!d.id)return I('idcard','A citizen without an ID card.',['rule.idcard','passport.country'],'I left my ID at home.');
+    if(d.id.dob!==d.passport.dob)return I('idcard','The birth dates don’t match.',['id.dob','passport.dob'],'Everyone mixes up birthdays.');
+    if(!DISTRICTS.includes(d.id.district))return I('idcard','The ID card district doesn’t exist.',['id.district','rule.idcard'],'It’s a real place. Ask anyone.');return null;}
+};
+const PLANT={
+  expiry:(t,c,r)=>{t.docs.passport.expiry=c.today-r.int(1,300);return true;},
+  photo:(t,c,r)=>{t.docs.passport.face=mutateFace(t.face,r);return true;},
+  city:(t,c,r)=>{const p=t.docs.passport;const o=r.pick(Object.keys(COUNTRIES).filter(k=>k!==p.country));p.city=r.pick(COUNTRIES[o]);return true;},
+  ticket:(t,c,r)=>{const d=t.docs;if(!foreign(t)||!d.ticket)return false;if(r.chance(.5))delete d.ticket;else d.ticket.date=c.today+(r.chance(.5)?1:-1)*r.int(1,20);return true;},
+  names:(t,c,r,o)=>{const ks=['ticket','work','vaccine','id'].filter(k=>t.docs[k]);if(!ks.length)return false;const k=r.pick(ks);t.docs[k].name=alterName(t.docs.passport.name,r,o&&o.subtle);return true;},
+  workpass:(t,c,r)=>{const d=t.docs;if(!d.work)return false;if(r.chance(.5))delete d.work;else d.work.number=alterNumber(d.work.number,r);return true;},
+  seal:(t,c,r)=>{if(!t.docs.work)return false;t.docs.work.seal=r.pick(BAD_SEALS);return true;},
+  banned:(t,c,r)=>{if(!foreign(t)||!c.banned||t.docs.passport.country===c.banned)return false;setCountry(t,c.banned,r);return true;},
+  vaccine:(t,c,r)=>{const d=t.docs;if(!d.vaccine)return false;if(r.chance(.5))delete d.vaccine;else d.vaccine.number=alterNumber(d.vaccine.number,r);return true;},
+  idcard:(t,c,r)=>{const d=t.docs;if(!d.id)return false;const v=r.int(0,2);if(v===0)delete d.id;else if(v===1)d.id.dob+=r.int(1,900)*(r.chance(.5)?1:-1);else d.id.district=r.pick(BAD_DISTRICTS);return true;}
+};
+function makeDay(day,seed,over){over=over||{};const r=rng((seed^Math.imul(day,7919))>>>0);
+  const rules=new Set(RULES.filter(x=>x.day<=day).map(x=>x.id));
+  const c={day,today:over.today||day,rules,banned:null,vaccine:[]};
+  if(rules.has('banned'))c.banned=over.banned||r.pick(FOREIGN);
+  if(rules.has('vaccine'))c.vaccine=over.vaccine||r.shuffle(FOREIGN.filter(x=>x!==c.banned)).slice(0,2);
+  return c;}
+function audit(t,c){return RULES.filter(x=>c.rules.has(x.id)).map(x=>CHECK[x.id](t,c)).filter(Boolean);}
+function makeTraveler(c,r,o){o=o||{};
+  const citizen=o.country?o.country===HOME:r.chance(.3);
+  const country=o.country||(citizen?HOME:r.pick(FOREIGN.filter(x=>x!==c.banned)));
+  const purpose=o.purpose||(citizen?'return':(r.chance(.35)?'work':'visit'));
+  const face=o.face||randFace(r);
+  const name=o.name||(r.pick(FIRST)+' '+r.pick(LAST));
+  const dob=c.today-r.int(18*365,75*365);
+  const pp={name,country,city:r.pick(COUNTRIES[country]),number:CODES[country]+'-'+r.int(10000,99999),dob,expiry:c.today+r.int(20,3000),face:Object.assign({},face)};
+  const d={passport:pp};
+  if(!citizen&&c.rules.has('ticket'))d.ticket={name,date:c.today};
+  if(!citizen&&purpose==='work'&&c.rules.has('workpass'))d.work={name,number:pp.number,seal:r.pick(SEALS),until:c.today+r.int(30,700)};
+  if(c.rules.has('vaccine')&&c.vaccine.includes(country))d.vaccine={name,number:pp.number,date:c.today-r.int(5,300)};
+  if(citizen&&c.rules.has('idcard'))d.id={name,dob,district:r.pick(DISTRICTS)};
+  const t={name,country,purpose,face,docs:d,planted:[]};
+  const p=o.p!=null?o.p:0.4;
+  if(r.chance(p)){let n=r.chance(.2)?2:1;for(const id of r.shuffle([...c.rules])){if(n<=0)break;if(PLANT[id](t,c,r,o)){t.planted.push(id);n--;}}}
+  t.issues=audit(t,c);
+  t.say=r.pick(LINES[purpose]);
+  return t;}
+G.BD={fmtDate,rng,HOME,COUNTRIES,CODES,FOREIGN,DISTRICTS,BAD_DISTRICTS,SEALS,BAD_SEALS,RULES,CHECK,PLANT,makeDay,makeTraveler,audit,sameFace,alterName,alterNumber};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+
+<!-- ============ game UI ============ -->
+<script>
+(function(){
+'use strict';
+const BD=window.BD, $=id=>document.getElementById(id);
+const PAGES_URL='https://dave098-1.github.io/passport-control-game/';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------------- platform + gate ---------------- */
+const UA=navigator.userAgent;
+const IS_IPAD=/iPad/.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_IOS=/iPhone|iPod/.test(UA)||IS_IPAD;
+const mq=q=>{try{return matchMedia(q).matches;}catch(e){return false;}};
+const IS_STANDALONE=navigator.standalone===true||mq('(display-mode: standalone)')||mq('(display-mode: fullscreen)');
+const SHARE_ICO='<svg class="ios-ico" viewBox="0 0 24 24" aria-label="Share"><path d="M12 3v12M8 7l4-4 4 4M6 11H5v10h14V11h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ADD_ICO='<svg class="ios-ico" viewBox="0 0 24 24" aria-label="Add"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+function showGate(){
+  const inApp=/FBAN|FBAV|Instagram|Line\/|GSA\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly/.test(UA);
+  const other=/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/.test(UA);
+  const steps=[], arrow=$('gate-arrow'); let note='';
+  const addSteps=[
+    `Scroll down the list and tap <b>Add to Home Screen</b> ${ADD_ICO}.`,
+    `Make sure <b>Open as Web App</b> is switched on if you see it, then tap <b>Add</b>.`,
+    `Close the browser and open <b>Border Desk</b> from your Home Screen.`];
+  if(inApp){
+    steps.push(`Tap the <b>⋯</b> or browser menu in this app and choose <b>Open in Safari</b>. If there isn't one, copy the link below and paste it into Safari.`);
+    steps.push(`In Safari, tap the <b>Share</b> button ${SHARE_ICO}.`);
+    steps.push(...addSteps);
+    $('gate-copy').hidden=false;
+    arrow.setAttribute('class','arrow up');
+  }else if(other){
+    steps.push(`Tap the <b>Share</b> button ${SHARE_ICO} in the address bar. In Firefox it's inside the <b>☰</b> menu.`);
+    steps.push(...addSteps);
+    note='Adding to the Home Screen from Chrome, Edge or Firefox needs iOS 16.4 or later. If you can’t find Add to Home Screen, open this page in Safari instead.';
+    $('gate-copy').hidden=false;
+    arrow.setAttribute('class','arrow up');
+  }else{
+    steps.push(IS_IPAD?`Tap the <b>Share</b> button ${SHARE_ICO} at the top right of Safari.`
+      :`Tap the <b>Share</b> button ${SHARE_ICO} in the toolbar at the bottom of Safari. On iOS 26, tap <b>⋯</b> first, then <b>Share</b>.`);
+    steps.push(...addSteps);
+    arrow.setAttribute('class',IS_IPAD?'arrow up':'arrow down');
+  }
+  $('gate-steps').innerHTML=steps.map(s=>`<li><span>${s}</span></li>`).join('');
+  $('gate-note').textContent=note;
+  const link=location.hostname.endsWith('github.io')?location.href.split('#')[0]:PAGES_URL;
+  $('gate-url').textContent=link;
+  $('gate-copy-btn').onclick=e=>{
+    const done=()=>{e.target.textContent='Copied';};
+    try{navigator.clipboard.writeText(link).then(done,()=>selectText($('gate-url')));}catch(err){selectText($('gate-url'));}
+  };
+  $('gate').hidden=false;
+}
+function selectText(el){const s=getSelection(),r=document.createRange();r.selectNodeContents(el);s.removeAllRanges();s.addRange(r);}
+
+/* ---------------- save ---------------- */
+const SAVE_KEY='borderdesk.v1';
+let SV={arcadeMax:0,best:{},endless:0,story:null,sound:true};
+try{Object.assign(SV,JSON.parse(localStorage.getItem(SAVE_KEY))||{});}catch(e){}
+function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SV));}catch(e){}}
+
+/* ---------------- audio ---------------- */
+let AC=null;
+function sound(kind){if(!SV.sound)return;try{
+  AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t=AC.currentTime;
+  if(kind==='stamp'){const len=.18,buf=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3);
+    const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();f.type='lowpass';f.frequency.value=600;g.gain.value=1.2;
+    s.buffer=buf;s.connect(f).connect(g).connect(AC.destination);s.start(t);return;}
+  const o=AC.createOscillator(),g=AC.createGain();o.connect(g).connect(AC.destination);
+  const P={good:['sine',880,.18,.18],bad:['square',110,.35,.12],ding:['triangle',660,.25,.15],soft:['sine',220,.15,.12]}[kind];
+  o.type=P[0];o.frequency.setValueAtTime(P[1],t);if(kind==='good')o.frequency.setValueAtTime(1320,t+.08);
+  g.gain.setValueAtTime(P[3],t);g.gain.exponentialRampToValueAtTime(.001,t+P[2]);o.start(t);o.stop(t+P[2]);
+}catch(e){}}
+
+/* ---------------- art ---------------- */
+const SKIN=['#f1d3b6','#e0b08a','#c68b5e','#9a6440','#6b4329'];
+const HAIRC=['#1e1a17','#5a3a22','#a8763e','#d9c27a','#8d8d8d'];
+const SHIRT=['#3d5a73','#6b3e3e','#4f6b45','#5c4f78','#7a6a48'];
+const COVER={Veldmark:'#2f5d50',Corvel:'#7a2e2e',Ostrand:'#2e4a7a',Pelagia:'#5f4a82',Tirrin:'#8a6a2e',Lumeno:'#2b7069',Zemora:'#4f5257'};
+function faceSVG(f){
+  const sk=SKIN[f.skin],hc=HAIRC[f.hc],sh=SHIRT[f.shirt||0];
+  const rx=[26,29,24][f.shape],ry=[31,29,34][f.shape],cx=50,cy=56,top=cy-ry;
+  const crop=`<path d="M${cx-rx-1} ${cy-4}Q${cx-rx} ${top-6} ${cx} ${top-5}Q${cx+rx} ${top-6} ${cx+rx+1} ${cy-4}Q${cx+rx-4} ${top+10} ${cx} ${top+9}Q${cx-rx+4} ${top+10} ${cx-rx-1} ${cy-4}Z" fill="${hc}"/>`;
+  let back='',hair='';
+  switch(f.hair){
+    case 0:hair=crop;break;
+    case 1:back=`<path d="M${cx-rx-6} ${cy+28}Q${cx-rx-9} ${top-9} ${cx} ${top-8}Q${cx+rx+9} ${top-9} ${cx+rx+6} ${cy+28}Z" fill="${hc}"/>`;
+      hair=`<path d="M${cx-rx} ${cy-2}Q${cx-rx+2} ${top-4} ${cx} ${top-4}Q${cx+rx-2} ${top-4} ${cx+rx} ${cy-2}Q${cx+rx-8} ${top+8} ${cx} ${top+8}Q${cx-rx+8} ${top+8} ${cx-rx} ${cy-2}Z" fill="${hc}"/>`;break;
+    case 2:hair=`<circle cx="${cx}" cy="${top-7}" r="10" fill="${hc}"/>`+crop;break;
+    case 3:hair=`<rect x="${cx-rx}" y="${top-10}" width="${rx*2}" height="19" rx="4" fill="${hc}"/>`;break;
+    case 4:hair=`<path d="M${cx-rx-2} ${cy-2}Q${cx-rx-4} ${top-8} ${cx+4} ${top-6}Q${cx+rx+4} ${top-4} ${cx+rx+2} ${cy-8}Q${cx+rx-6} ${top+6} ${cx-6} ${top+14}Q${cx-rx+2} ${top+16} ${cx-rx-2} ${cy-2}Z" fill="${hc}"/>`;break;
+  }
+  const ey=cy-2;let eyes='';
+  for(const ex of [cx-10,cx+10]){
+    if(f.eyes===0)eyes+=`<circle cx="${ex}" cy="${ey}" r="2.6" fill="#1d1d1d"/>`;
+    else if(f.eyes===1)eyes+=`<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="1.5" fill="#1d1d1d"/>`;
+    else eyes+=`<ellipse cx="${ex}" cy="${ey}" rx="4" ry="2.7" fill="#fff"/><circle cx="${ex}" cy="${ey}" r="1.9" fill="#1d1d1d"/>`;
+    eyes+=`<path d="M${ex-5} ${ey-7}L${ex+5} ${ey-8}" stroke="${hc}" stroke-width="2.4" stroke-linecap="round"/>`;
+  }
+  const beard=f.beard?`<path d="M${cx-rx+2} ${cy+4}Q${cx-rx+4} ${cy+ry+4} ${cx} ${cy+ry+5}Q${cx+rx-4} ${cy+ry+4} ${cx+rx-2} ${cy+4}Q${cx+rx-8} ${cy+22} ${cx} ${cy+21}Q${cx-rx+8} ${cy+22} ${cx-rx+2} ${cy+4}Z" fill="${hc}"/>`:'';
+  const glasses=f.glasses?`<g fill="rgba(255,255,255,.15)" stroke="#111" stroke-width="2"><circle cx="${cx-10}" cy="${ey}" r="6.5"/><circle cx="${cx+10}" cy="${ey}" r="6.5"/><path d="M${cx-3.5} ${ey}h7" fill="none"/></g>`:'';
+  return `<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<path d="M6 120Q10 92 50 89Q90 92 94 120Z" fill="${sh}"/><rect x="${cx-8}" y="${cy+ry-8}" width="16" height="16" fill="${sk}"/>${back}
+<ellipse cx="${cx-rx}" cy="${cy}" rx="4" ry="7" fill="${sk}"/><ellipse cx="${cx+rx}" cy="${cy}" rx="4" ry="7" fill="${sk}"/>
+<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${sk}"/>${hair}${eyes}
+<path d="M${cx} ${cy+2}q-3 8 1 9" stroke="rgba(0,0,0,.35)" stroke-width="1.6" fill="none"/>${beard}
+<path d="M${cx-7} ${cy+15}Q${cx} ${cy+19} ${cx+7} ${cy+15}" stroke="#6b2e2a" stroke-width="2" fill="none" stroke-linecap="round"/>${glasses}</svg>`;
+}
+function sealSVG(k){
+  let rays='';for(let i=0;i<8;i++){const a=i*Math.PI/4;rays+=`<line x1="${22+Math.cos(a)*9}" y1="${22+Math.sin(a)*9}" x2="${22+Math.cos(a)*13}" y2="${22+Math.sin(a)*13}" stroke="currentColor" stroke-width="2"/>`;}
+  const P={sun:`<circle cx="22" cy="22" r="6" fill="currentColor"/>${rays}`,
+    tower:'<path d="M15 31V16h3v-3h3v3h2v-3h3v3h3v15z" fill="currentColor"/>',
+    wave:'<path d="M10 25q3-5 6 0t6 0t6 0t6 0M10 18q3-5 6 0t6 0t6 0t6 0" fill="none" stroke="currentColor" stroke-width="2.5"/>',
+    crown:'<path d="M12 29l-1-12 6 5 5-8 5 8 6-5-1 12z" fill="currentColor"/>',
+    key:'<circle cx="16" cy="22" r="5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M21 22h12M29 22v4M32 22v3" stroke="currentColor" stroke-width="2.5"/>',
+    moon:'<path d="M26 12a10 10 0 1 0 0 20a8 8 0 1 1 0-20z" fill="currentColor"/>'};
+  return `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>${P[k]}</svg>`;
+}
+
+/* ---------------- story content ---------------- */
+const BREL='Chief Brel', IVO='Ivo, booth two';
+const STORY={
+  intro:{
+    1:[[BREL,'Welcome to the Eastern Checkpoint, officer. Today there are two rules: no expired passports, and the face must match the photo.'],[BREL,'Approve good papers, deny bad ones. Every mistake goes on your record.'],[IVO,'I’m Ivo. Keep your head down and you’ll be fine.']],
+    2:[[BREL,'The Ministry found forged passports printed in cities that don’t exist. Check the issuing city against the list in your rulebook.']],
+    3:[[BREL,'From today, foreigners need an entry ticket for today’s date. Every name must match the passport.'],[IVO,'Tickets. More paper. Wonderful.']],
+    4:[[BREL,'Foreign workers now need a work pass that carries their passport number.'],[IVO,'There’s a reporter hanging around the queue. Don’t talk to her.']],
+    5:[[BREL,'Fake work passes are going around. Only the Sun, Tower and Wave seals are real.'],[IVO,'Some of the regulars tip well, if you know what I mean. Nobody checks.']],
+    6:[[BREL,'Talks with Ostrand broke down overnight. One country will be closed each day from now on. Read the rulebook every morning.']],
+    7:[[BREL,'Grayfever cases in the region. Travelers from the listed countries need a vaccine slip.'],[BREL,'And today the closed country is Zemora.']],
+    8:[[BREL,'Our own citizens now show an ID card. Check the district and the date of birth.']],
+    9:[[BREL,'A word before you start. Someone at this checkpoint is taking money. I think it’s Ivo.'],
+       {choice:'Will you put your name to a report about Ivo?',options:[
+         {label:'Report Ivo',fn:F=>{F.reported=true;},reply:[[BREL,'Thank you. It won’t be forgotten.']]},
+         {label:'Say you saw nothing',fn:F=>{F.reported=false;},reply:[[BREL,'Hm. Back to work, then.']]}]}],
+    10:[[BREL,'Last day of your probation. The Ministry will read your numbers tonight.'],[IVO,'Whatever happens, it was good working next to you.']]
+  },
+  over:{6:{banned:'Ostrand'},7:{banned:'Zemora',vaccine:['Corvel','Tirrin']},8:{banned:'Pelagia'},9:{banned:'Tirrin'},10:{banned:'Corvel'}},
+  scripted:{
+    3:[{at:3,name:'Anni Desh',country:'Tirrin',purpose:'visit',mutate:t=>{delete t.docs.ticket;},
+        say:'Please, officer. My husband Pavel lives in Brask. The ticket office closed before I reached it. I can’t go back.',
+        decide:(ok,F)=>{F.anni=ok?'in':'out';if(ok)F.mercy++;}}],
+    4:[{at:2,name:'Mara Tellen',country:'Lumeno',purpose:'visit',say:'Mara Tellen, Lumeno Herald. People in the queue say they’ve waited three days. Is that true?'}],
+    5:[{at:4,name:'Fenn Kovac',country:'Zemora',purpose:'work',mutate:t=>{t.docs.work.seal='crown';},
+        say:'Fenn Kovac. My pass is fine, I promise. And something for your trouble…',
+        choice:{text:'He slides 50 crowns under the glass.',options:[{label:'Take the money',fn:(F,S)=>{F.bribes++;S.score+=50;}},{label:'Push it back',fn:()=>{}}]}}],
+    6:[{at:2,name:'Pavel Desh',country:'Veldmark',purpose:'return',
+        say:F=>F.anni==='in'?'You’re the one who let Anni through? Thank you. We have a home again.':F.anni==='out'?'My wife was turned back here. I’m going to Tirrin to bring her the right papers.':'Coming home. Long queue today.'}],
+    7:[{at:5,name:'Fenn Kovac',country:'Zemora',purpose:'visit',
+        say:'Zemora’s closed, I know. A hundred crowns says it isn’t, for me.',
+        choice:{text:'He slides 100 crowns under the glass.',options:[{label:'Take the money',fn:(F,S)=>{F.bribes++;S.score+=100;}},{label:'Push it back',fn:()=>{}}]}}],
+    8:[{at:3,name:'Mara Tellen',country:'Lumeno',purpose:'work',mutate:(t,c,r)=>{t.docs.work.number=BD.alterNumber(t.docs.work.number,r);},
+        say:'They refused my press pass and sold me this work pass instead. The number’s wrong, I know. I’m writing about this border. Let me in.',
+        decide:(ok,F)=>{if(ok){F.mercy++;F.mara=true;}}}],
+    10:[{at:4,name:'Fenn Kovac',country:'Zemora',purpose:'visit',mutate:(t,c)=>{t.docs.passport.expiry=c.today-40;},
+        say:'Last time, officer. Two hundred crowns, and you never see me again.',
+        choice:{text:'He slides 200 crowns under the glass.',options:[{label:'Take the money',fn:(F,S)=>{F.bribes++;S.score+=200;}},{label:'Push it back',fn:()=>{}}]}}]
+  }
+};
+function storyEnding(st){
+  const F=st.flags;
+  if(st.cites>=12)return['Dismissed','Your record has too many citations. The Ministry ends your probation, and you hand in your stamp at the gate you used to guard.'];
+  if(F.bribes>0)return['Pocket Lined',F.reported?'Ivo is questioned, and he names you too. You both lose your posts. You keep the money, for now.':'You and Ivo split the regulars between you. The money is good. Every knock at the door makes you jump.'];
+  if(F.mercy>0)return['Open Door',(F.mara?'Mara’s article about the Eastern Checkpoint runs on the front page. ':'')+'People in the queue start asking for your booth by name. '+(F.anni==='in'?'Anni and Pavel Desh send a card. ':'')+'Brel pretends not to notice.'];
+  return['Model Officer',F.reported?'Ivo is transferred. You take booth one for good, and Brel trusts you with the keys.':'Your record is spotless. The Ministry makes your post permanent. The queue never gets shorter.'];
+}
+
+/* ---------------- game state ---------------- */
+const S={mode:null,day:1,c:null,r:null,t:null,score:0,streak:0,cites:0,correct:0,processed:0,flags:0,time:0,
+  running:false,paused:false,inspect:false,sel:[],busy:false,queue:null,idx:0,timer:null,last:0};
+
+function show(id){for(const s of ['menu','game'])$(s).hidden=s!==id;}
+function overlay(html){$('overlay-card').innerHTML=html;$('overlay').hidden=false;}
+function closeOverlay(){$('overlay').hidden=true;}
+let toastT;
+function toast(msg,kind){const el=$('toast');el.textContent=msg;el.className='toast '+kind;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,1800);}
+
+/* ---------------- menu ---------------- */
+function renderMenu(){
+  show('menu');stopTimer();
+  const sb=$('story-btns');
+  if(SV.story){sb.innerHTML=`<button class="btn primary" id="st-cont" type="button">Continue · Day ${SV.story.day}</button><button class="btn" id="st-new" type="button">Start over</button>`;
+    $('story-meta').textContent=`Day ${SV.story.day} of 10`;}
+  else{sb.innerHTML=`<button class="btn primary" id="st-new" type="button">Start story</button>`;$('story-meta').textContent='10 days';}
+  const cont=$('st-cont');if(cont)cont.onclick=()=>storyDay();
+  $('st-new').onclick=()=>{SV.story={day:1,seed:(Math.random()*2**31)|0,flags:{mercy:0,bribes:0,reported:null,anni:null,mara:false},pay:0,cites:0};persist();storyDay();};
+  const max=Math.min(SV.arcadeMax+1,30);let h='';
+  for(let d=1;d<=max;d++){const b=SV.best[d];h+=`<button class="chip-day${b==null?' new':''}" type="button" data-day="${d}"><b>Day ${d}</b><small>${b==null?'new':'best '+b}</small></button>`;}
+  $('arcade-days').innerHTML=h;
+  $('arcade-days').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>startArcade(+b.dataset.day));
+  $('endless-meta').textContent='Best: '+SV.endless+' travelers';
+  $('btn-sound').textContent='Sound: '+(SV.sound?'on':'off');
+}
+function howTo(after){
+  overlay(`<h2>How to play</h2><div class="howto"><ol>
+<li>A traveler steps up to your booth and hands over their documents.</li>
+<li>Read the <b>Rulebook</b>. It lists today's rules, the valid cities, seals and districts.</li>
+<li>Compare every document with the rules, with each other, and with the traveler's face.</li>
+<li>Stamp <b>Approve</b> if everything is in order, <b>Deny</b> if anything is wrong. A wrong call is a citation.</li>
+<li>Optional: turn on <b>Inspect</b> and tap two things that disagree, like an expiry date and today's date. You get a bonus when you then deny.</li>
+</ol><p style="margin-top:10px">Keyboard: <b>A</b> approve, <b>D</b> deny, <b>I</b> inspect, <b>R</b> rulebook, <b>Esc</b> pause.</p></div>
+<button class="btn primary" id="ov-ok" type="button">Got it</button>`);
+  $('ov-ok').onclick=()=>{closeOverlay();after&&after();};
+}
+
+/* ---------------- shifts ---------------- */
+function resetShift(mode,day,c){
+  Object.assign(S,{mode,day,c,r:BD.rng((Math.random()*2**31)>>>0),t:null,score:0,streak:0,cites:0,correct:0,processed:0,flags:0,
+    inspect:false,sel:[],busy:false,queue:null,idx:0,paused:false});
+  setInspect(false);
+  show('game');renderBook();
+  $('hud-day').textContent=mode==='endless'?'Endless':(mode==='story'?'Story · ':'')+'Day '+day;
+  $('hud-date').innerHTML=`<span class="lbl" hidden>Today</span>${BD.fmtDate(c.today)}`;
+}
+function startArcade(day){
+  const c=BD.makeDay(day,(Math.random()*2**31)>>>0);
+  resetShift('arcade',day,c);S.time=180;
+  const go=()=>{nextTraveler();startTimer();};
+  if(!SV.seenHow){SV.seenHow=true;persist();howTo(go);}else go();
+}
+function startEndless(){
+  const c=BD.makeDay(99,(Math.random()*2**31)>>>0,{today:15});
+  resetShift('endless',0,c);
+  const go=()=>{nextTraveler();startTimer();};
+  if(!SV.seenHow){SV.seenHow=true;persist();howTo(go);}else go();
+}
+function storyDay(){
+  const st=SV.story;const day=st.day;
+  const c=BD.makeDay(day,(st.seed+day*101)>>>0,STORY.over[day]);
+  const sc=STORY.scripted[day]||[];const n=8+sc.length;const q=new Array(n).fill(null);sc.forEach(s=>q[Math.min(s.at,n-1)]=s);
+  const begin=()=>{resetShift('story',day,c);S.queue=q;S.idx=0;nextTraveler();startTimer();};
+  runScene(STORY.intro[day]||[],st.flags,()=>{if(day===1&&!SV.seenHow){SV.seenHow=true;persist();howTo(begin);}else begin();},`Day ${day}`);
+}
+function runScene(lines,F,done,title){
+  lines=lines.slice();let i=0;
+  const step=()=>{
+    if(i>=lines.length){closeOverlay();done();return;}
+    const L=lines[i++];
+    if(L.choice){
+      overlay(`<div class="speaker">${esc(title||'')}</div><p class="line">${esc(L.choice)}</p><div class="choices">${L.options.map((o,k)=>`<button class="btn${k?'':' primary'}" type="button" data-k="${k}">${esc(o.label)}</button>`).join('')}</div>`);
+      $('overlay-card').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const o=L.options[+b.dataset.k];o.fn(F);persist();lines.splice(i,0,...(o.reply||[]));step();});
+      return;
+    }
+    overlay(`<div class="speaker">${esc(L[0])}</div><p class="line">${esc(L[1])}</p><button class="btn primary" id="ov-next" type="button">${i>=lines.length?'Start shift':'Continue'}</button>`);
+    $('ov-next').onclick=step;$('ov-next').focus();
+  };
+  step();
+}
+
+function nextTraveler(){
+  S.busy=false;S.sel=[];hl();
+  if(S.mode==='story'&&S.idx>=S.queue.length)return endShift();
+  if(S.mode==='endless'&&S.cites>=3)return endShift();
+  if(S.mode==='arcade'&&S.time<=0)return endShift();
+  let t;
+  if(S.mode==='story'){
+    const spec=S.queue[S.idx++];const p=Math.min(.5,.3+S.day*.02);
+    if(spec){t=BD.makeTraveler(S.c,S.r,{p:0,name:spec.name,country:spec.country,purpose:spec.purpose});
+      if(spec.mutate)spec.mutate(t,S.c,S.r);t.issues=BD.audit(t,S.c);
+      t.say=typeof spec.say==='function'?spec.say(SV.story.flags):spec.say;t.spec=spec;}
+    else t=BD.makeTraveler(S.c,S.r,{p});
+  }else if(S.mode==='endless'){
+    t=BD.makeTraveler(S.c,S.r,{p:Math.min(.6,.35+S.processed*.01),subtle:S.processed>20});
+    if(S.processed>0&&S.processed%10===0){S.c.banned=S.r.pick(BD.FOREIGN);renderBook();toast('New bulletin: '+S.c.banned+' is closed.','info');}
+  }else t=BD.makeTraveler(S.c,S.r,{p:Math.min(.5,.3+S.day*.02)});
+  t.flagged=[];S.t=t;renderTraveler();hud();
+  if(t.spec&&t.spec.choice){const ch=t.spec.choice;
+    setTimeout(()=>{S.paused=true;
+      overlay(`<div class="speaker">${esc(t.name)}</div><p class="line">${esc(ch.text)}</p><div class="choices">${ch.options.map((o,k)=>`<button class="btn${k?'':' primary'}" type="button" data-k="${k}">${esc(o.label)}</button>`).join('')}</div>`);
+      $('overlay-card').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ch.options[+b.dataset.k].fn(SV.story.flags,S);persist();closeOverlay();S.paused=false;hud();});
+    },700);}
+}
+
+function F(key,label,val){return `<button type="button" class="f" data-key="${key}"><span class="lbl">${label}</span><span class="val">${esc(val)}</span></button>`;}
+function renderTraveler(){
+  const t=S.t,d=t.docs,p=d.passport;
+  const face=$('face');face.innerHTML=faceSVG(t.face);face.classList.remove('arrive');void face.offsetWidth;face.classList.add('arrive');
+  $('who').textContent=S.mode==='story'?`Traveler ${S.idx} of ${S.queue.length}`:`Traveler ${S.processed+1}`;
+  $('speech').textContent=t.say;
+  $('purpose').innerHTML=`<span class="val" style="color:inherit;font:inherit">Purpose: ${{visit:'Visit',work:'Work',return:'Returning citizen'}[t.purpose]}</span>`;
+  let h=`<article class="doc passport" style="--cover:${COVER[p.country]}"><header><span>${esc(p.country.toUpperCase())}</span><b>Passport</b></header>
+<div class="pp-body"><button type="button" class="f photo" data-key="passport.photo" aria-label="Passport photo">${faceSVG(p.face)}</button>
+<div class="fields">${F('passport.name','Name',p.name)}${F('passport.dob','Born',BD.fmtDate(p.dob))}${F('passport.country','Country',p.country)}${F('passport.city','Issued in',p.city)}${F('passport.number','Passport no.',p.number)}${F('passport.expiry','Expires',BD.fmtDate(p.expiry))}</div></div></article>`;
+  if(d.ticket)h+=`<article class="doc ticket"><header><span>VELDMARK</span><b>Entry ticket</b></header><div class="body">${F('ticket.name','Name',d.ticket.name)}${F('ticket.date','Valid on',BD.fmtDate(d.ticket.date))}</div></article>`;
+  if(d.work)h+=`<article class="doc work"><header><span>MINISTRY OF LABOR</span><b>Work pass</b></header><div class="body work-grid"><div>${F('work.name','Name',d.work.name)}${F('work.number','Passport no.',d.work.number)}${F('work.until','Valid until',BD.fmtDate(d.work.until))}</div>
+<button type="button" class="f seal-btn" data-key="work.seal" aria-label="Seal">${sealSVG(d.work.seal)}</button></div></article>`;
+  if(d.vaccine)h+=`<article class="doc vaccine"><header><span>HEALTH OFFICE</span><b>Grayfever vaccine</b></header><div class="body">${F('vaccine.name','Name',d.vaccine.name)}${F('vaccine.number','Passport no.',d.vaccine.number)}${F('vaccine.date','Dose given',BD.fmtDate(d.vaccine.date))}</div></article>`;
+  if(d.id)h+=`<article class="doc idcard"><header><span>VELDMARK</span><b>Citizen ID</b></header><div class="body">${F('id.name','Name',d.id.name)}${F('id.dob','Born',BD.fmtDate(d.id.dob))}${F('id.district','District',d.id.district)}</div></article>`;
+  $('docs').innerHTML=h;$('docs').scrollLeft=0;$('desk').scrollTop=0;
+}
+function renderBook(){
+  const c=S.c;let h=`<h3>Bulletin · ${BD.fmtDate(c.today)}</h3>`;
+  for(const r of BD.RULES){if(!c.rules.has(r.id))continue;
+    let extra='';
+    if(r.id==='city')extra='<table>'+Object.entries(BD.COUNTRIES).map(([k,v])=>`<tr><td>${k}</td><td>${v.join(', ')}</td></tr>`).join('')+'</table>';
+    if(r.id==='seal')extra=`<div class="seals">${BD.SEALS.map(sealSVG).join('')}</div><span style="font:12px var(--mono);color:var(--muted)">Sun · Tower · Wave</span>`;
+    if(r.id==='banned')extra=`<b style="color:var(--deny);font-family:var(--mono)">Closed today: ${c.banned}</b>`;
+    if(r.id==='vaccine')extra=`<span style="font-family:var(--mono)">Slip required from: <b>${c.vaccine.join(', ')}</b></span>`;
+    if(r.id==='idcard')extra=`<span style="font:12px var(--mono);color:var(--muted)">Valid districts: ${BD.DISTRICTS.join(', ')}</span>`;
+    const isNew=S.mode!=='endless'&&r.day===Math.min(S.day,8)&&S.day<=8;
+    h+=`<button type="button" class="rule f${isNew?' new':''}" data-key="rule.${r.id}">${isNew?'<span class="tag">NEW TODAY</span>':''}<span>${r.text}</span>${extra}</button>`;
+  }
+  $('book-body').innerHTML=h;
+}
+function hud(){
+  $('hud-score').textContent=S.mode==='story'?S.score+' cr':S.score;
+  const m=mult();$('hud-mult').textContent=S.mode!=='story'&&m>1?'×'+m:'';
+  const mid=$('hud-mid');mid.classList.remove('warn');
+  if(S.mode==='arcade'){const s=Math.max(0,Math.ceil(S.time));mid.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s<=20)mid.classList.add('warn');}
+  else if(S.mode==='endless'){mid.textContent='Mistakes '+S.cites+'/3';if(S.cites===2)mid.classList.add('warn');}
+  else mid.textContent='Citations '+S.cites;
+}
+const mult=()=>Math.min(4,1+Math.floor(S.streak/3));
+function startTimer(){stopTimer();S.last=performance.now();S.timer=setInterval(()=>{
+  const now=performance.now(),dt=(now-S.last)/1000;S.last=now;
+  if(S.mode!=='arcade'||S.paused||!$('overlay').hidden)return;
+  S.time-=dt;hud();if(S.time<=0&&!S.busy){S.busy=true;toast('Shift over','info');setTimeout(endShift,700);}
+},250);}
+function stopTimer(){clearInterval(S.timer);S.timer=null;}
+
+function decide(approve){
+  if(S.busy||!S.t||!$('overlay').hidden||$('game').hidden)return;
+  S.busy=true;setInspect(false);closeBook();
+  const t=S.t,valid=t.issues.length===0,ok=approve===valid;
+  const st=$('stamp');st.textContent=approve?'Entry granted':'Entry denied';st.className='stamp '+(approve?'ok':'no');st.hidden=false;
+  sound('stamp');setTimeout(()=>{st.hidden=true;},650);
+  if(t.spec&&t.spec.decide)t.spec.decide(approve,SV.story.flags);
+  S.processed++;
+  if(ok){S.correct++;S.streak++;
+    const bonus=approve?0:t.flagged.length;S.flags+=bonus;
+    S.score+=S.mode==='story'?5+bonus*2:10*mult()+bonus*5;
+    setTimeout(()=>{sound('good');toast(approve?'Correct. Welcome to Veldmark.':'Correct. '+t.issues[0].text,'good');},250);
+  }else{S.cites++;S.streak=0;S.score-=S.mode==='story'?5:10;
+    setTimeout(()=>{sound('bad');toast(approve?'Citation: '+t.issues[0].text:'Citation: their papers were in order.','bad');},250);}
+  hud();persist();
+  setTimeout(nextTraveler,1300);
+}
+
+function endShift(){
+  stopTimer();S.busy=true;
+  const stats=`<div class="stats"><div class="stat"><b>${S.processed}</b><small>Processed</small></div><div class="stat"><b>${S.correct}</b><small>Correct</small></div><div class="stat"><b>${S.cites}</b><small>Citations</small></div><div class="stat"><b>${S.score}${S.mode==='story'?' cr':''}</b><small>${S.mode==='story'?'Pay':'Score'}</small></div></div>`;
+  if(S.mode==='arcade'){
+    const prev=SV.best[S.day];const rec=prev==null||S.score>prev;if(rec)SV.best[S.day]=S.score;SV.arcadeMax=Math.max(SV.arcadeMax,S.day);persist();
+    overlay(`<h2>Shift over · Day ${S.day}</h2><p>${rec?'New best for this day.':'Best for this day: '+prev}</p>${stats}
+<div class="row"><button class="btn primary" id="o1" type="button">Day ${S.day+1}</button><button class="btn" id="o2" type="button">Replay day</button><button class="btn" id="o3" type="button">Menu</button></div>`);
+    $('o1').onclick=()=>{closeOverlay();startArcade(S.day+1);};$('o2').onclick=()=>{closeOverlay();startArcade(S.day);};$('o3').onclick=()=>{closeOverlay();renderMenu();};
+  }else if(S.mode==='endless'){
+    const rec=S.correct>SV.endless;if(rec)SV.endless=S.correct;persist();
+    overlay(`<h2>Three strikes</h2><p>${rec?'New best: '+S.correct+' correct decisions.':'Best: '+SV.endless+' correct decisions.'}</p>${stats}
+<div class="row"><button class="btn primary" id="o1" type="button">Try again</button><button class="btn" id="o3" type="button">Menu</button></div>`);
+    $('o1').onclick=()=>{closeOverlay();startEndless();};$('o3').onclick=()=>{closeOverlay();renderMenu();};
+  }else{
+    const st=SV.story;st.pay+=S.score;st.cites+=S.cites;const day=st.day;
+    if(day>=10){
+      const [title,text]=storyEnding(st);SV.story=null;persist();
+      overlay(`<div class="speaker">Ending</div><h2>${esc(title)}</h2><p class="line">${esc(text)}</p><p>Total pay ${st.pay} cr · ${st.cites} citations over 10 days.</p><button class="btn primary" id="o3" type="button">Back to menu</button>`);
+      $('o3').onclick=()=>{closeOverlay();renderMenu();};
+    }else{
+      st.day=day+1;persist();
+      overlay(`<h2>End of day ${day}</h2><p>Record so far: ${st.cites} citations · ${st.pay} cr earned.</p>${stats}
+<div class="row"><button class="btn primary" id="o1" type="button">Day ${day+1}</button><button class="btn" id="o3" type="button">Save and quit</button></div>`);
+      $('o1').onclick=()=>{closeOverlay();storyDay();};$('o3').onclick=()=>{closeOverlay();renderMenu();};
+    }
+  }
+}
+
+/* ---------------- inspect ---------------- */
+function setInspect(on){S.inspect=on;S.sel=[];document.body.classList.toggle('inspecting',on);$('btn-inspect').classList.toggle('on',on);$('inspect-bar').hidden=!on;hl();}
+function hl(){document.querySelectorAll('#game [data-key]').forEach(el=>el.classList.toggle('sel',S.sel.includes(el.dataset.key)));}
+function pick(key){
+  if(!S.inspect||S.busy||!S.t)return;
+  const i=S.sel.indexOf(key);if(i>=0)S.sel.splice(i,1);else S.sel.push(key);hl();
+  if(S.sel.length<2)return;
+  const k=S.sel.slice().sort().join('|');
+  const iss=S.t.issues.find(x=>x.fields.slice().sort().join('|')===k);
+  if(iss){if(!S.t.flagged.includes(k))S.t.flagged.push(k);$('speech').textContent=iss.say;toast('Discrepancy: '+iss.text,'info');sound('ding');}
+  else{$('speech').textContent='I don’t see a problem there.';sound('soft');}
+  setTimeout(()=>{S.sel=[];hl();},700);
+}
+function openBook(){$('book').classList.add('open');}
+function closeBook(){$('book').classList.remove('open');}
+function pause(){if($('game').hidden||!$('overlay').hidden)return;S.paused=true;
+  overlay(`<h2>Paused</h2><div class="row"><button class="btn primary" id="o1" type="button">Resume</button><button class="btn" id="o2" type="button">How to play</button><button class="btn" id="o4" type="button">Sound: ${SV.sound?'on':'off'}</button><button class="btn" id="o3" type="button">Quit to menu</button></div>${S.mode==='story'?'<p>Quitting restarts this story day next time.</p>':''}`);
+  $('o1').onclick=()=>{closeOverlay();S.paused=false;S.last=performance.now();};
+  $('o2').onclick=()=>howTo(()=>{S.paused=false;S.last=performance.now();});
+  $('o4').onclick=e=>{SV.sound=!SV.sound;persist();e.target.textContent='Sound: '+(SV.sound?'on':'off');};
+  $('o3').onclick=()=>{closeOverlay();renderMenu();};}
+
+/* ---------------- wiring ---------------- */
+function wire(){
+  $('btn-approve').onclick=()=>decide(true);
+  $('btn-deny').onclick=()=>decide(false);
+  $('btn-inspect').onclick=()=>setInspect(!S.inspect);
+  $('btn-book').onclick=()=>$('book').classList.contains('open')?closeBook():openBook();
+  $('book-close').onclick=closeBook;
+  $('btn-pause').onclick=pause;
+  $('btn-endless').onclick=startEndless;
+  $('btn-howto').onclick=()=>howTo();
+  $('btn-sound').onclick=()=>{SV.sound=!SV.sound;persist();renderMenu();};
+  $('game').addEventListener('click',e=>{const el=e.target.closest('[data-key]');if(el)pick(el.dataset.key);});
+  document.addEventListener('keydown',e=>{
+    if($('game').hidden||e.metaKey||e.ctrlKey||e.altKey)return;
+    const k=e.key.toLowerCase();
+    if(k==='escape'){if(!$('overlay').hidden&&S.paused&&$('o1')){$('o1').click();}else pause();return;}
+    if(!$('overlay').hidden)return;
+    if(k==='a')decide(true);else if(k==='d')decide(false);else if(k==='i')setInspect(!S.inspect);
+    else if(k==='r')$('book').classList.contains('open')?closeBook():openBook();
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&!$('game').hidden&&$('overlay').hidden)pause();});
+  let deferred=null;
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('btn-install').hidden=false;});
+  $('btn-install').onclick=()=>{if(deferred){deferred.prompt();deferred=null;$('btn-install').hidden=true;}};
+}
+
+/* ---------------- boot ---------------- */
+if(IS_IOS&&!IS_STANDALONE){showGate();}
+else{wire();renderMenu();}
+if('serviceWorker' in navigator&&(location.hostname.endsWith('github.io')||location.hostname==='localhost')){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+window.__BD_STATE=S;
+})();
+</script>
+</body>
+</html>

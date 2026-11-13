@@ -18,7 +18,9 @@ manifest.webmanifest← name, display: "standalone", icons, theme color (Pages o
 icons/icon-180.png, icon-192.png, icon-512.png  (apple-touch-icon + manifest)
 sw.js               ← small service worker: cache index.html + icons for offline play (Pages only)
 tools/gen-icons.js  ← Playwright script that renders the SVG logo to PNG icons
-.github/workflows/pages.yml ← deploy repo root to GitHub Pages on push to main
+.nojekyll           ← Pages serves files as-is (deploy from branch main, root folder)
+tools/build-artifact.js ← strips the page wrapper to make the artifact version
+tests/engine.test.js, tests/e2e.js ← rules engine test and Playwright browser tests
 README.md           ← how to play / install
 ```
 `index.html` links the manifest, `apple-touch-icon` and `<meta name="apple-mobile-web-app-capable" content="yes">`, and registers `sw.js` only if it exists (on Pages). Inside the artifact those tags have no effect, which is harmless.
@@ -49,7 +51,7 @@ The gate is a full-screen block with no way into the game. It contains:
 
 Android and desktop are never blocked. On Android a dismissible "Install app" banner uses `beforeinstallprompt` (Pages only).
 
-**Behavior as an artifact:** Phase 0 checks what `navigator.standalone` and `display-mode` report inside the claude.ai frame when the artifact is opened from an iOS Home Screen icon.
+**Behavior as an artifact (confirmed on a real iPhone: detection works from the Home Screen, so the artifact uses the same gate):** Phase 0 checks what `navigator.standalone` and `display-mode` report inside the claude.ai frame when the artifact is opened from an iOS Home Screen icon.
 - If detection works there, the gate applies to the artifact the same way.
 - If it does not, the artifact on iOS shows the same gate. The step-by-step guide then points to the GitHub Pages URL, the reliable installable version, so no one gets stuck on a screen they can never get past.
 
@@ -84,7 +86,7 @@ Pages is enabled on the repo. The site URL is **https://dave098-1.github.io/pass
 4. **Endless mode** (reuses the engine; difficulty curve).
 5. **Story mode:** scene system, about 10 days of content, choices, endings, saved progress.
 6. **Polish:** SVG faces and documents, stamp animation, sounds, tutorial for day 1, accessibility (focus order, ARIA labels on stamps).
-7. **Installable app:** manifest, icons (`tools/gen-icons.js`), `sw.js`, Pages workflow, README.
+7. **Installable app:** manifest, icons (`tools/gen-icons.js`), `sw.js`, README. Pages deploys straight from `main` (no workflow needed).
 8. **Publish:** commit and push to `claude/relaxed-euler-h7n9ce`, publish the artifact, and give both links.
 
 ## Verification
