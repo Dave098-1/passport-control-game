@@ -220,8 +220,8 @@ async function playRight(page, i = 0, keys = KEY) { await ready(page, i); await 
   {
     const { ctx, page, errs } = await desktop({ tutorialDone: true });
     await page.click('#btn-race-online');
-    await page.waitForFunction(() => /Claude version/.test(document.getElementById('overlay').textContent));
-    ok(true, 'online: explains it needs the Claude version when there is no room');
+    await page.waitForFunction(() => /internet connection/.test(document.getElementById('overlay').textContent), null, { timeout: 15000 });
+    ok(true, 'online: explains it needs a connection when the race server can\u2019t be reached');
     await ctx.close();
     // Stand-in for the artifact's room capability: one local peer, enough to drive host -> race -> results.
     const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
