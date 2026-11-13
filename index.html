@@ -15,7 +15,7 @@
 <link rel="icon" href="icons/icon-192.png">
 </head>
 <body>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=Outfit:wght@400;500;600&display=swap">
 <style>
 /* Layout: night-shift checkpoint. Booth | desk of paper documents | rulebook; on phones the booth is a strip and the rulebook a drawer.
    Split-screen race: desk | rulebook | desk. */
@@ -259,6 +259,26 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 .linkish{background:none;border:0;padding:4px 0;color:var(--lamp);font-weight:600;text-decoration:underline;text-underline-offset:3px}
 .save-pick{display:grid;gap:2px;text-align:left}
 .save-pick small{color:var(--muted);font-weight:400}
+/* account screen (light card, matches the requested login design) */
+.card.acc-light{background:#fff;color:#1f1f1f;border-color:#e6e6e6;max-width:430px;padding:40px 26px 26px;font-family:"Outfit",var(--sans);position:relative}
+.acc-light .acc{gap:14px}
+.acc-close{position:absolute;top:10px;right:12px;width:36px;height:36px;border:0;background:none;color:#8a8a8a;font-size:26px;line-height:1;border-radius:50%}
+.acc-light .btn.google{display:flex;align-items:center;justify-content:center;gap:10px;background:#1c1c1c;color:#fff;border:0;border-radius:14px;min-height:56px;font:500 18px "Outfit",var(--sans)}
+.acc-light .or{display:flex;align-items:center;gap:16px;color:#555;font:400 16px "Outfit",var(--sans);text-transform:none;letter-spacing:0;margin:8px 0}
+.acc-light .or::before,.acc-light .or::after{content:"";flex:1;height:1px;background:#e6e6e6}
+.field{position:relative;display:block}
+.field svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:#3a3a3a;pointer-events:none}
+.acc-light .field input{width:100%;height:56px;padding:0 16px 0 50px;background:#fafafa;border:1px solid #e3e3e3;border-radius:14px;color:#1f1f1f;font:400 17px "Outfit",var(--sans)}
+.acc-light .field input::placeholder{color:#5f5f5f}
+.acc-light .field input:focus-visible{outline:2px solid #1c1c1c;outline-offset:1px}
+.acc-light .btn.acc-go{min-height:56px;background:#efefef;border:1px solid #dcdcdc;border-radius:14px;color:#111;font:500 19px "Outfit",var(--sans);box-shadow:0 1px 2px rgba(0,0,0,.06);margin-top:4px}
+.acc-light .linkish.dark{color:#1f1f1f;text-decoration:none;font:500 16px "Outfit",var(--sans);justify-self:center}
+.acc-switch{text-align:center;color:#666!important;font:400 16px "Outfit",var(--sans)}
+.acc-switch .linkish.dark{display:inline;padding:0}
+.acc-note{text-align:center;color:#8a8a8a!important;font:400 13px "Outfit",var(--sans)}
+.acc-light .acc-err{color:#c62828;text-align:center}
+.acc-light .acc-err.ok{color:#2e7d32}
+.acc-light button:focus-visible{outline:2px solid #1c1c1c;outline-offset:2px}
 /* coach marks */
 #coach{position:fixed;inset:0;z-index:1000;pointer-events:none}
 .spot{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(4,9,14,.62);border:2px solid var(--lamp);transition:all .25s ease;pointer-events:none}
@@ -721,18 +741,21 @@ ${Cloud.error?`<p class="acc-err">Last sync failed: ${esc(Cloud.error)}</p>`:''}
     return;
   }
   const signup=view==='signup';
+  const MAIL='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m4 7 8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  const LOCK='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></svg>';
   overlay(`<div class="acc">
-<h2>${signup?'Create account':'Log in'}</h2><p>Keep your story, crowns and tools on every device. You can always play without an account.</p>
-<button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>Continue with Google</span></button>
-${IS_IOS&&IS_STANDALONE?'<p class="small-note">On iPhone, if Google sign-in finishes in Safari instead of coming back here, use email and password in the app.</p>':''}
+<button class="acc-close" id="acc-x" type="button" aria-label="Close and play without an account">\u00d7</button>
+<button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>${signup?'Sign up':'Login'} with Google</span></button>
+${IS_IOS&&IS_STANDALONE?'<p class="acc-note">On iPhone, if Google finishes in Safari instead of coming back here, use email and password in the app.</p>':''}
 <div class="or"><span>or</span></div>
-<label>Email<input id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"></label>
-<label>Password<input id="acc-pw" type="password" autocomplete="${signup?'new-password':'current-password'}" placeholder="${signup?'At least 8 characters':''}"></label>
-${signup?'<label>Repeat password<input id="acc-pw2" type="password" autocomplete="new-password"></label>':''}
+<label class="field">${MAIL}<input id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="Your Email" aria-label="Your email"></label>
+<label class="field">${LOCK}<input id="acc-pw" type="password" autocomplete="${signup?'new-password':'current-password'}" placeholder="${signup?'Password (8+ characters)':'Your Password'}" aria-label="Your password"></label>
+${signup?`<label class="field">${LOCK}<input id="acc-pw2" type="password" autocomplete="new-password" placeholder="Repeat Password" aria-label="Repeat password"></label>`:''}
 <p class="acc-err" id="acc-err" hidden></p>
-<button class="btn primary" id="acc-go" type="button">${signup?'Create account':'Log in'}</button>
-<div class="row acc-links">${signup?'<button class="linkish" id="acc-switch" type="button">I already have an account</button>':'<button class="linkish" id="acc-switch" type="button">Create an account</button><button class="linkish" id="acc-forgot" type="button">Forgot password?</button>'}</div>
-<button class="btn" id="acc-x" type="button">Play without an account</button></div>`);
+<button class="btn acc-go" id="acc-go" type="button">${signup?'Sign up':'Log in'}</button>
+${signup?'':'<button class="linkish dark" id="acc-forgot" type="button">Forgot password?</button>'}
+<p class="acc-switch">${signup?'Already have an account?':'Don\u2019t have an account?'} <button class="linkish dark" id="acc-switch" type="button">${signup?'Log in':'Sign up'}</button></p>
+<p class="acc-note">Playing without an account is fine. An account keeps your progress on every device.</p></div>`,'acc-light');
   $('acc-x').onclick=closeOverlay;
   $('acc-switch').onclick=()=>accountScreen(signup?'login':'signup');
   $('acc-google').onclick=async()=>{const {error}=await Cloud.sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]}});if(error)accErr(friendly(error.message));};
@@ -888,7 +911,7 @@ const SHOP=[
 
 /* ================= helpers ================= */
 const NAMES={visit:'Visit',work:'Work',return:'Returning citizen',transit:'Transit',diplomatic:'Diplomatic'};
-function overlay(html){$('overlay-card').innerHTML=html;$('overlay').hidden=false;}
+function overlay(html,cls){const c=$('overlay-card');c.className='card'+(cls?' '+cls:'');c.innerHTML=html;$('overlay').hidden=false;}
 function closeOverlay(){$('overlay').hidden=true;}
 function show(id){for(const s of ['menu','game'])$(s).hidden=s!==id;}
 let PAUSED=false, DESKS=[];
