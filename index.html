@@ -625,7 +625,7 @@ async function setupGoogleButton(signup){
     callback:async r=>{const {error}=await Cloud.sb.auth.signInWithIdToken({provider:'google',token:r.credential,nonce:raw});
       if(error)return accErr(friendly(error.message));closeOverlay();setTimeout(()=>Cloud.atMenu(),0);}});
   google.accounts.id.renderButton(slot,{type:'standard',theme:'filled_black',size:'large',shape:'rectangular',text:signup?'signup_with':'signin_with',logo_alignment:'center',width:Math.min(400,Math.max(200,fallback.clientWidth))});
-  slot.hidden=false;$('acc-google-alt').hidden=false;
+  slot.hidden=false;
   const fit=()=>{const inner=slot.firstElementChild;if(!inner||!$('acc-gsi'))return;inner.style.transform='';const r=inner.getBoundingClientRect(),b=fallback.getBoundingClientRect();
     if(r.width&&r.height&&b.width)inner.style.transform=`scale(${b.width/r.width},${b.height/r.height})`;};
   fit();setTimeout(fit,400);setTimeout(fit,1500);
@@ -770,7 +770,7 @@ ${Cloud.error?`<p class="acc-err">Last sync failed: ${esc(Cloud.error)}</p>`:''}
   overlay(`<div class="acc">
 <button class="acc-close" id="acc-x" type="button" aria-label="Close and play without an account">\u00d7</button>
 <div class="g-wrap"><button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>${signup?'Sign up':'Login'} with Google</span></button><div class="gsi-slot" id="acc-gsi" hidden></div></div>
-<button class="linkish dark small-alt" id="acc-google-alt" type="button" hidden>Google pop-up not opening? Try the other way</button>
+<button class="linkish dark small-alt" id="acc-google-alt" type="button" hidden>Google not opening? Try the other way</button>
 ${IS_IOS&&IS_STANDALONE?'<p class="acc-note">On iPhone, if Google finishes in Safari instead of coming back here, use email and password in the app.</p>':''}
 <div class="or"><span>or</span></div>
 <label class="field">${MAIL}<input id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="Your Email" aria-label="Your email"></label>
@@ -783,9 +783,21 @@ ${signup?'':'<button class="linkish dark" id="acc-forgot" type="button">Forgot p
 <p class="acc-note">Playing without an account is fine. An account keeps your progress on every device.</p></div>`,'acc-light');
   $('acc-x').onclick=closeOverlay;
   $('acc-switch').onclick=()=>accountScreen(signup?'login':'signup');
-  setupGoogleButton(signup);
-  $('acc-google-alt').onclick=()=>$('acc-google').click();
-  $('acc-google').onclick=async()=>{const {error}=await Cloud.sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]}});if(error)accErr(friendly(error.message));};
+  const gsiReady=setupGoogleButton(signup);
+  const googleRedirect=async()=>{const {error}=await Cloud.sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]}});if(error)accErr(friendly(error.message));};
+  const usePopup=!!GOOGLE_CLIENT_ID&&Cloud.kind==='web';
+  if(usePopup)$('acc-google-alt').hidden=false;
+  $('acc-google-alt').onclick=googleRedirect;
+  // The designed button never falls back to the redirect on its own: if a tap reaches it (Google's
+  // invisible button not ready, or the tap not passed through), ask Google for its own sign-in prompt.
+  $('acc-google').onclick=async()=>{
+    if(!usePopup)return googleRedirect();
+    accErr('Opening Google sign-in…',true);
+    await gsiReady;
+    if(!(window.google&&google.accounts&&google.accounts.id)){accErr('Google sign-in couldn’t load. Tap “Try the other way” below, or use email.');return;}
+    google.accounts.id.prompt(n=>{try{if((n.isNotDisplayed&&n.isNotDisplayed())||(n.isSkippedMoment&&n.isSkippedMoment()))
+      accErr('Google’s sign-in window couldn’t open here. Tap “Try the other way” below, or use email.');}catch(e){}});
+  };
   const f=$('acc-forgot');if(f)f.onclick=async()=>{const email=$('acc-email').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return accErr('Type your email above first, then tap Forgot password.');
     const {error}=await Cloud.sb.auth.resetPasswordForEmail(email,{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]});if(error)return accErr(friendly(error.message));accErr('Check your email for a link to reset your password.',true);};
   $('acc-go').onclick=async e=>{
