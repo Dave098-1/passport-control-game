@@ -21,6 +21,12 @@ A passport control game for desktop and mobile browsers. You are an officer at t
 - **Daily events** (from day 3): rush hour, inspector visit, a pushy VIP, or a power cut.
 - **Booth shop**: spend the crowns you earn on Quick stamp, Checklist card, Thermos, UV lamp and Lucky charm.
 
+## Accounts (optional)
+Players can play as guests, or log in to keep their story, crowns, tools and best scores on every device.
+- **GitHub Pages version:** email + password or Google, through Supabase (project `border-desk`). Saves live in the `saves` table; row-level security lets each player read and write only their own row. The key in `index.html` is the public anon key, which is safe to publish.
+- **Claude version:** saves go to the viewer's Claude account automatically (artifact `db` + `user` capabilities), with no login screen.
+- **Sync rules:** the newest save wins. The first time someone logs in on a device that already has progress, the game asks which save to keep. Saves are never swapped in the middle of a shift.
+
 ## Controls
 | Action | Touch / mouse | Keyboard (split-screen player 2) |
 | --- | --- | --- |
@@ -41,9 +47,10 @@ On iOS the game only runs from the Home Screen. Opening it in Safari or another 
 | `index.html` | The whole game: HTML, CSS, the rules engine (`<script id="engine">`) and the UI |
 | `manifest.webmanifest`, `icons/`, `sw.js` | Home Screen app and offline support on GitHub Pages |
 | `tools/gen-icons.js` | Renders the app icons (`node tools/gen-icons.js`) |
-| `tools/build-artifact.js` | Makes the Claude artifact version of `index.html` (published with the `room` capability for online races) |
+| `tools/build-artifact.js` | Makes the Claude artifact version of `index.html` (published with the `room`, `db` and `user` capabilities) |
 | `tests/engine.test.js` | Rules engine test (`node tests/engine.test.js`) |
 | `tests/e2e.js` | Browser tests with Playwright (`node tests/e2e.js`) |
+| `tests/accounts.e2e.js` | Account and sync tests against a stand-in Supabase (`node tests/accounts.e2e.js`) |
 
 ## Publishing on GitHub Pages
 Settings → Pages → Source: **Deploy from a branch**, branch `main`, folder `/ (root)`. When `index.html` changes, bump `VERSION` in `sw.js` so installed copies pick up the update.

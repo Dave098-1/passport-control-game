@@ -1,4 +1,111 @@
-# Plan: Border Desk v2 features
+# Plan: Border Desk accounts (cross-device saves)
+
+## Context
+v2 is built, pushed and open as PR #1. Today every save lives in the browser's `localStorage` under `borderdesk.v1` (`SV` + `persist()` in `index.html`), so progress stays on one device. On iPhone, the Home Screen app also has storage separate from Safari.
+
+The user wants an **optional login** so players can keep their story progress, crowns, tools, best scores and settings on every device. Choices made:
+- **Supabase** as the backend. Their org "dave098" is connected and has no projects yet.
+- **Email + password** login.
+
+Guests keep playing exactly as now, with no login required.
+
+## Where it runs (answer to "where do I upload this?")
+Nothing new to host. The setup stays:
+- **The game** (the login page included) stays on **GitHub Pages**: https://dave098-1.github.io/passport-control-game/. Merge PR #1, plus a follow-up commit with accounts, and it's live.
+- **The server part** (accounts, passwords, Google sign-in, saves) is **Supabase**, which hosts it for free. The game talks to it straight from the browser.
+- **Google** only needs to know the Pages address and the Supabase callback address. Both are in the setup guide.
+
+## 1. Supabase project (via the Supabase MCP tools)
+1. Create a free project `border-desk` in org `dave098`. Check the cost with the confirm-cost step first; the free tier is $0.
+2. Migration `create_saves`:
+   ```sql
+   create table public.saves (
+     user_id uuid primary key references auth.users on delete cascade,
+     data jsonb not null check (pg_column_size(data) < 100000),
+     updated_at timestamptz not null default now()
+   );
+   alter table public.saves enable row level security;
+   create policy "own save: read"   on public.saves for select using (auth.uid() = user_id);
+   create policy "own save: insert" on public.saves for insert with check (auth.uid() = user_id);
+   create policy "own save: update" on public.saves for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+   create policy "own save: delete" on public.saves for delete using (auth.uid() = user_id);
+   ```
+3. Run `get_advisors` (security) and fix anything it flags. Then fetch the project URL and the **publishable** key. Both are safe to put in the page, because RLS stops anyone reading another player's save.
+4. **You do one thing in the dashboard:** Authentication → Sign In / Providers → Email → turn off **Confirm email**.
+   - Supabase's built-in email sender only allows a few emails per hour, so with confirmation on, sign-ups would get stuck.
+   - Password-reset emails still work, within that same hourly limit.
+
+## 2. Login + sync in the game (`index.html`, GitHub Pages version)
+- **Library:** load `@supabase/supabase-js` pinned (`cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js`).
+  - Load it only when a player opens the Account screen, or a saved session exists.
+  - Without internet the game works as today.
+- **Menu:** a new **Account** button.
+  - Signed out: "Log in to save across devices".
+  - Signed in: "email · Synced 2 min ago".
+- **Account screen** (overlay, same style as the shop):
+  - **Log in** and **Create account** tabs: email, password, and repeat password on sign-up. Error messages say what to fix ("Wrong email or password", "Password needs 8+ characters").
+  - **Forgot password:** sends the reset email. When the link opens the game (`PASSWORD_RECOVERY` event), a "Set a new password" form appears.
+  - Signed in: **Sync now**, **Log out**, and **Delete my cloud save**. Deleting the account itself needs a server function, so it's left out for now.
+- **Sync rules** (a small `Cloud` module; storage adapters described in §3):
+  - `persist()` stamps `SV.updatedAt`. When signed in, it uploads 2 s after the last change (debounced) and when the app goes to the background.
+  - **First login on a device:**
+    - no cloud save yet → upload this device's save;
+    - this device has no progress → take the cloud save;
+    - both have progress → ask "Keep cloud save (Story day 7, 420 crowns, saved Tuesday) or this device's (Story day 3, 80 crowns)?".
+  - **After that:** on app start and when the app comes back to the front, the newer save wins automatically. Saves are only applied while on the menu, never mid-shift.
+  - Synced: everything in `SV` except per-device settings (`sound`).
+  - Logging out keeps the local save on that device.
+- **iPhone:** email + password works inside the Home Screen app, and the session stays in that app's own storage.
+
+## 2b. Google sign-in (added at the user's request)
+- **Account screen:** a **Continue with Google** button (`supabase.auth.signInWithOAuth({provider:'google', options:{redirectTo: PAGES_URL}})`) above the email + password form.
+- **Look:** waiting on the picture the user is resending. The layout and styling will match it. Until it arrives: Google button, an "or" divider, then email + password, in the game's colors.
+- **Setup:** I do my part; for yours, I give you a click-by-click guide with the exact values filled in, once the project exists.
+  1. **Google Cloud Console:**
+     - create a project;
+     - fill in the OAuth consent screen (External, app name "Border Desk", your email);
+     - Credentials → Create OAuth client ID → *Web application*.
+     - Authorized JavaScript origin: `https://dave098-1.github.io`.
+     - Authorized redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`. I'll give you the exact value.
+     - Copy the Client ID and Client secret.
+  2. **Supabase dashboard:**
+     - Authentication → Sign In / Providers → **Google** → enable, paste the ID and secret.
+     - Authentication → URL Configuration → Site URL = the Pages URL, and add it to Redirect URLs.
+     - Never paste the secret into the chat.
+- **iPhone caveat:** Google sign-in sends the page away to Google and back.
+  - In some iOS versions, a Home Screen app finishes that sign-in in a Safari window instead of the app.
+  - I'll detect when the app comes back without a session, and show "Google sign-in didn't return to the app. Use email + password here, or sign in with Google in Safari."
+  - The real behavior needs a check on your iPhone.
+
+## 3. Claude artifact version: automatic, no login page
+The artifact can't reach Supabase, because its security rules block other sites. It already knows who is signed in to Claude, so it uses the artifact's own storage:
+- the `user` capability for the player's id;
+- the `db` capability, writing one private document per player at `data/users/<id>/save`, which only that player can read.
+
+It shares the same `Cloud` sync rules through a second storage adapter. The Account button there just says "Saved to your Claude account". Republish with `capabilities: {room:{}, db:{}, user:{}}`.
+
+## 4. Files
+- `index.html`: Account button and screen, the `Cloud` module with the Supabase and Claude-db adapters, `persist()` hook, CSS.
+- `sw.js`: bump `VERSION`. Leave Supabase API calls out of the cache, so only same-origin files and fonts are cached.
+- `tests/e2e.js`: account tests (below).
+- `README.md`, `PLAN.md`: accounts section.
+
+## Verification
+- **Browser tests with a stand-in Supabase.** The library request is intercepted and served a stub client:
+  - create account → save uploaded;
+  - second "device" with a different cloud save → the keep-which choice appears, and the chosen one is applied;
+  - newer save wins on restart;
+  - log out keeps local progress;
+  - a wrong password shows the error;
+  - guest play makes no network calls.
+- **Claude-db adapter test:** a stand-in `claude.use('db'|'user')` gets saved to and loaded from.
+- `node tests/engine.test.js` and the existing e2e suite stay green.
+- **Real backend:** after the migration, `get_advisors` reports no RLS warnings. A SQL check confirms RLS is on and the 4 policies exist. If this session's network allows supabase.co, I run one real sign-up → save → read-back with a throwaway account, then delete it. Otherwise you test on your phone: create an account on the iPhone app, play, then log in on a computer and see the same progress.
+- Push to the PR #1 branch, so merging it ships accounts too, and republish the artifact.
+
+---
+
+# (Previous) Plan: Border Desk v2 features
 
 ## Context
 Border Desk v1 is built and pushed (`index.html` single file, branch `claude/relaxed-euler-h7n9ce`, artifact https://claude.ai/artifact/T7X67Cxe17RTTxAJUi8QPT). The user picked six additions:
@@ -121,6 +228,12 @@ Steps 0–9 are built, all browser and engine tests pass, and the artifact is re
 One thing is left: **commit and push** the last `index.html` fixes, which are local only:
 - the phone grid fix that kept the stamp buttons on screen;
 - a readable "Next" button in the tutorial.
+
+## Next: get the game onto GitHub Pages
+The Pages URL is https://dave098-1.github.io/passport-control-game/. It serves `main`, and the game is still only on `claude/relaxed-euler-h7n9ce`.
+1. Open a pull request from `claude/relaxed-euler-h7n9ce` into `main`, with a short summary of v1 + v2. First check the repo for a PR template.
+2. The user merges it on GitHub.
+3. Pages source must be "Deploy from a branch → main → / (root)". After a minute or two the link shows the game.
 
 ## Verification
 - `node tests/engine.test.js` covers days 1–20: valid travelers pass, every planted rule (new ones included) is caught, diplomats are exempt, and `crime` is set only for the crime rules.
