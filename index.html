@@ -262,7 +262,10 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 /* account screen (light card, matches the requested login design) */
 .card.acc-light{background:#fff;color:#1f1f1f;border-color:#e6e6e6;max-width:430px;padding:40px 26px 26px;font-family:"Outfit",var(--sans);position:relative}
 .acc-light .acc{gap:14px}
-.gsi-slot{display:flex;justify-content:center;min-height:44px}
+.g-wrap{position:relative;display:grid}
+/* Google's real button sits invisibly over the designed one, so taps open Google's pop-up */
+.gsi-slot{position:absolute;inset:0;opacity:.01;overflow:hidden;z-index:2;border-radius:14px}
+.gsi-slot>div{transform-origin:0 0}
 .acc-light .small-alt{font-size:13px;color:#777;justify-self:center}
 .acc-close{position:absolute;top:10px;right:12px;width:36px;height:36px;border:0;background:none;color:#8a8a8a;font-size:26px;line-height:1;border-radius:50%}
 .acc-light .btn.google{display:flex;align-items:center;justify-content:center;gap:10px;background:#1c1c1c;color:#fff;border:0;border-radius:14px;min-height:56px;font:500 18px "Outfit",var(--sans)}
@@ -621,8 +624,11 @@ async function setupGoogleButton(signup){
   google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,nonce:await sha256hex(raw),ux_mode:'popup',itp_support:true,
     callback:async r=>{const {error}=await Cloud.sb.auth.signInWithIdToken({provider:'google',token:r.credential,nonce:raw});
       if(error)return accErr(friendly(error.message));closeOverlay();setTimeout(()=>Cloud.atMenu(),0);}});
-  google.accounts.id.renderButton(slot,{type:'standard',theme:'filled_black',size:'large',shape:'rectangular',text:signup?'signup_with':'signin_with',logo_alignment:'center',width:Math.min(400,Math.max(200,slot.clientWidth||fallback.clientWidth))});
-  slot.hidden=false;fallback.hidden=true;$('acc-google-alt').hidden=false;
+  google.accounts.id.renderButton(slot,{type:'standard',theme:'filled_black',size:'large',shape:'rectangular',text:signup?'signup_with':'signin_with',logo_alignment:'center',width:Math.min(400,Math.max(200,fallback.clientWidth))});
+  slot.hidden=false;$('acc-google-alt').hidden=false;
+  const fit=()=>{const inner=slot.firstElementChild;if(!inner||!$('acc-gsi'))return;inner.style.transform='';const r=inner.getBoundingClientRect(),b=fallback.getBoundingClientRect();
+    if(r.width&&r.height&&b.width)inner.style.transform=`scale(${b.width/r.width},${b.height/r.height})`;};
+  fit();setTimeout(fit,400);setTimeout(fit,1500);
 }
 const DEVICE_KEYS=['sound','cloudUser','updatedAt'];
 const syncable=s=>{const o={};for(const k of Object.keys(s))if(!DEVICE_KEYS.includes(k))o[k]=s[k];return o;};
@@ -763,8 +769,7 @@ ${Cloud.error?`<p class="acc-err">Last sync failed: ${esc(Cloud.error)}</p>`:''}
   const LOCK='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></svg>';
   overlay(`<div class="acc">
 <button class="acc-close" id="acc-x" type="button" aria-label="Close and play without an account">\u00d7</button>
-<div class="gsi-slot" id="acc-gsi" hidden></div>
-<button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>${signup?'Sign up':'Login'} with Google</span></button>
+<div class="g-wrap"><button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>${signup?'Sign up':'Login'} with Google</span></button><div class="gsi-slot" id="acc-gsi" hidden></div></div>
 <button class="linkish dark small-alt" id="acc-google-alt" type="button" hidden>Google pop-up not opening? Try the other way</button>
 ${IS_IOS&&IS_STANDALONE?'<p class="acc-note">On iPhone, if Google finishes in Safari instead of coming back here, use email and password in the app.</p>':''}
 <div class="or"><span>or</span></div>
