@@ -1,101 +1,135 @@
-# Plan: "Border Desk", a passport control game (browser, mobile + desktop, Home Screen app)
+# Plan: Border Desk v2 features
 
 ## Context
-The repo `passport-control-game` is empty (just `README.md`). The goal is an original, document-inspection passport control game that:
-- plays in any desktop or mobile browser (mouse, touch, keyboard),
-- is published as a Claude artifact **and** on GitHub Pages (user's choice), so the Home Screen version is a real full-screen app whose manifest and icon we control,
-- **on iOS, refuses to run in the browser** and shows step-by-step "Add to Home Screen" instructions; it only plays when launched from the Home Screen,
-- has three modes: **Arcade shifts**, **Story campaign** and **Endless**.
+Border Desk v1 is built and pushed (`index.html` single file, branch `claude/relaxed-euler-h7n9ce`, artifact https://claude.ai/artifact/T7X67Cxe17RTTxAJUi8QPT). The user picked six additions:
+**booth upgrades shop, Detain + questioning, new rules for days 9–14, random daily events, guided tutorial, drag & compare papers.**
+Today days after 8 just repeat the same rules, story pay has no use, and the only help is a text screen; these features fix that.
 
-Everything is original: the name, fictional countries, art (made in code, as SVG/CSS) and rules. It is in the inspection-game genre but does not copy any existing game.
+Everything stays in `index.html`: the engine in `<script id="engine">` (no DOM, tested by `tests/engine.test.js`) and the UI script below it. Existing pieces to reuse:
+- engine: `RULES`, `CHECK`, `PLANT`, `makeDay`, `makeTraveler`, `audit`, `rng`, `alterName/alterNumber`
+- UI: `decide()`, `nextTraveler()`, `renderTraveler()`, `renderBook()`, `hud()`, `overlay()`/`runScene()`, `pick()` (Inspect), save object `SV` + `persist()`, `STORY` data, `sound()`
 
-## Architecture
-Vanilla HTML/CSS/JS, no build step and no external dependencies. That way the same file works as an artifact and as a static site.
+## 1. New rules, days 9–14 (engine)
+Each gets `CHECK` + `PLANT` and two inspect fields, same pattern as the existing rules. After day 14 every rule is active.
 
-```
-index.html          ← whole game (inline CSS + JS), the artifact source
-manifest.webmanifest← name, display: "standalone", icons, theme color (Pages only)
-icons/icon-180.png, icon-192.png, icon-512.png  (apple-touch-icon + manifest)
-sw.js               ← small service worker: cache index.html + icons for offline play (Pages only)
-tools/gen-icons.js  ← Playwright script that renders the SVG logo to PNG icons
-.nojekyll           ← Pages serves files as-is (deploy from branch main, root folder)
-tools/build-artifact.js ← strips the page wrapper to make the artifact version
-tests/engine.test.js, tests/e2e.js ← rules engine test and Playwright browser tests
-README.md           ← how to play / install
-```
-`index.html` links the manifest, `apple-touch-icon` and `<meta name="apple-mobile-web-app-capable" content="yes">`, and registers `sw.js` only if it exists (on Pages). Inside the artifact those tags have no effect, which is harmless.
+| Day | Rule | New data | Inspect pair |
+|---|---|---|---|
+| 9 | **Stay**: the length of stay the traveler *says* must match the entry ticket | `ticket.stay`, `t.answers.stay` | `answer.stay` + `ticket.stay` |
+| 10 | **Height**: passport height must match the booth's height chart (±4 cm) | `pp.height`, `t.height` | `passport.height` + `booth.height` |
+| 11 | **Fingerprint**: work-pass print must match the traveler's print (asked for in the booth) | `work.print`, `t.print` (pattern: whorl/loop/arch + variant, drawn as SVG) | `work.print` + `booth.print` |
+| 12 | **Transit**: transit travelers need a transit slip leaving within 2 days | new purpose `transit`, doc `transit {name, until}` | `transit.until` + `desk.date` / missing: `rule.transit` + `booth.purpose` |
+| 13 | **Diplomats**: diplomatic passports (gold cover) skip ticket, vaccine and closed-country rules but need an accreditation letter from the same country | `pp.diplomat`, doc `letter {name, country}` | `letter.country` + `passport.country` |
+| 14 | **Minors**: under-18s need a guardian consent form; guardian's surname matches | ages 8–17 only when active, doc `consent {name, guardian}` | `consent.guardian` + `passport.name` |
 
-Organization of the JS inside `index.html` (sections, not separate files):
-1. `platform`: iOS and standalone detection, the gate screen
-2. `rng`: seeded PRNG (mulberry32) so days and runs can be reproduced
-3. `data`: fictional countries, names, document templates, the rules list
-4. `gen`: makes travelers with documents and (sometimes) planted discrepancies
-5. `rules`: one rule = `{id, text, check(traveler, day) → null | discrepancy}`
-6. `ui`: desk layout, document cards, stamping, the rulebook, the inspect/compare tool
-7. `modes`: arcade, story and endless controllers sharing one `Shift` engine
-8. `save`: localStorage wrapped in try/catch (high scores, story progress, settings)
-9. `audio`: tiny WebAudio sounds (stamp thunk, buzzer), off when muted
+The diplomat exemption is a check inside `ticket`, `vaccine` and `banned`. **Crimes:** issues from `photo`, `city`, `seal`, `fingerprint` and the forged-`letter` variant get `crime: true` (impostors and forgers). Expired papers and missing tickets don't.
 
-## iOS gate (the key requirement)
-```js
-const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS
-const isStandalone = navigator.standalone === true ||
-              matchMedia('(display-mode: standalone)').matches;
-if (isIOS && !isStandalone) showInstallGate(); else boot();
-```
-The gate is a full-screen block with no way into the game. It contains:
-- a short heading ("Install to play") and an illustrated 3-step guide: **1.** tap the Share button (an inline SVG of the iOS share icon) → **2.** scroll down, tap **Add to Home Screen** → **3.** tap **Add**, then open *Border Desk* from your Home Screen,
-- variants by browser: Safari (Share is in the bottom bar on iPhone and the top bar on iPad), Chrome/Firefox/Edge on iOS (`CriOS|FxiOS|EdgiOS`: Share button in the address bar, iOS 16.4+), and in-app browsers (Instagram, Facebook, Gmail and so on: "Open this page in Safari first", with a copy-link button),
-- an animated arrow pointing at where the Share button is.
+## 2. Detain + questioning (UI)
+- **Detain**, a third stamp unlocked on day 4 (key `X`). `decide('approve'|'deny'|'detain')`:
+  - detaining a traveler with a crime: correct, +25 × multiplier (story +15 cr);
+  - detaining someone who's only invalid: citation, "Wrongful detention";
+  - detaining a valid traveler: citation;
+  - denying a criminal stays correct, just without the bonus.
+- **Ask** button in the booth opens a question list: *Purpose of your visit?*, *How long are you staying?*, *Where will you stay?*, and from day 11 *Fingerprint, please*. Answers go into a small transcript in the booth.
+  - The stay answer is a tappable field (`answer.stay`); the fingerprint card becomes `booth.print`.
+  - Criminals sometimes dodge a question ("Why do you ask?") as a soft clue.
+- **Story:** Brel introduces Detain on day 4. Detaining Fenn Kovac (day 5 fake seal, or later) sets `F.fennCaught`, which the endings mention. Days 9–10 intros teach Stay and Height.
 
-Android and desktop are never blocked. On Android a dismissible "Install app" banner uses `beforeinstallprompt` (Pages only).
+## 3. Random daily events
+`makeDay` rolls an event from day 3, 40% of shifts in Arcade and Endless (Endless rolls a new one every 15 travelers). It's announced on a banner at shift start and shown as a HUD chip. Story uses fixed events: rush hour day 5, inspector day 7, power cut day 9.
+- **Rush hour:** 2-minute shift, travelers arrive twice as fast, points ×1.5.
+- **Inspector visit:** correct calls and citations both count double.
+- **VIP:** one traveler with bad papers says "Do you know who I am?". Denying them gives +30 ("Brel backs you up").
+- **Power cut:** documents are dark. Tapping one lights it for 4 s. The UV lamp lights everything.
 
-**Behavior as an artifact (confirmed on a real iPhone: detection works from the Home Screen, so the artifact uses the same gate):** Phase 0 checks what `navigator.standalone` and `display-mode` report inside the claude.ai frame when the artifact is opened from an iOS Home Screen icon.
-- If detection works there, the gate applies to the artifact the same way.
-- If it does not, the artifact on iOS shows the same gate. The step-by-step guide then points to the GitHub Pages URL, the reliable installable version, so no one gets stuck on a screen they can never get past.
+## 4. Booth upgrades shop
+One wallet, `SV.crowns`, shared by all modes:
+- Arcade earns score ÷ 5.
+- Endless earns 2 per correct call.
+- Story earns that day's pay. Endings still use flags and citations, not money.
 
-## Game design
-**Core loop (all modes):** a traveler walks up and hands over 1–4 documents: passport, entry ticket, work pass, ID card, vaccine slip. The player compares them with the day's **bulletin** (the current rules) and with each other, then stamps **APPROVE** or **DENY**. Optional **Inspect** mode: tap two mismatched fields (for example, the passport name and the permit name) to "flag" them, which earns a bonus and makes the traveler admit the discrepancy. Mistakes give a citation; 3 citations in a shift give a penalty, or end the run in Endless.
+**Shop** is a screen opened from the menu and after every shift or story day. Purchases are permanent (`SV.upgrades`). Each owned tool shows a toggle or works on its own.
 
-**Checks (introduced gradually):** passport expired, issuing country not on the allowed list, a required document missing, names that don't match, ID numbers that don't match, photo doesn't match the face (generated faces with different hair, glasses and so on), wrong seal on a permit, entry date outside the permit window, a banned country for today, a forged-looking document (wrong font or color).
+| Item | Price | Effect |
+|---|---|---|
+| Quick stamp | 80 | Next traveler arrives in 0.6 s instead of 1.3 s |
+| Checklist card | 100 | Lists which rules apply to *this* traveler (doesn't give the answer) |
+| Thermos | 120 | +20 s on every arcade shift |
+| UV lamp | 150 | `UV` toggle: fake seals and forged letters glow, real passports show a watermark; also beats power cuts |
+| Lucky charm | 200 | First citation of each shift is forgiven (in Endless, one extra life) |
 
-**Generator:** each traveler is valid by default. With probability *p(day)*, 1–2 discrepancies are planted, picked only from the rules active today. Faces are SVG made of parts (head shape, skin tone, hair, eyes, glasses, beard), so the photo-mismatch check works by changing one part.
+## 5. Drag & compare papers (wide screens ≥ 900 px, including iPad landscape)
+- Documents become absolutely positioned on the desk, starting in a fanned cascade. Drag them by their header using pointer events, with `touch-action:none` on headers only.
+- The last touched document comes to the front. A movement under 5 px counts as a tap, so Inspect taps on fields still work.
+- **Line up** button snaps the two most recently touched documents side by side.
+- Positions reset for each traveler. Phones keep the swipe row.
 
-**Modes:**
-- **Arcade shifts:** 3-minute shift; each new day adds one rule (days 1–10 and then random mixes). Score = correct decisions × streak multiplier + flag bonuses − citations. Best score per day is saved.
-- **Story campaign:** about 10 days at the fictional border of "Veldmark". Short scripted scenes between days, recurring characters (smuggler, family, a reporter) and 2–3 choices (let a traveler through against the rules, take a bribe, report a colleague) that unlock one of three endings. Story travelers are hand-written entries added to the normal generator queue.
-- **Endless:** no timer and all rules active, more and more difficult (more documents, subtler discrepancies), 3 mistakes and the run is over. Saves best count.
+## 6. Guided tutorial
+- A coach-mark component: a spotlight (big `box-shadow` cutout around the target), a speech bubble, and Next/Skip. A step can wait for an action ("Press Approve").
+- Scripted 3-traveler tutorial using `makeTraveler` with forced plants:
+  1. valid papers: point at the face, photo, expiry and date, then Approve;
+  2. expired passport: Deny;
+  3. a different face: Inspect, tap photo + face, then Detain.
+- Runs automatically the first time (replacing the text screen), and can be replayed from the menu.
+- A one-time tip for each **new rule** when it unlocks: spotlight the "NEW TODAY" rule and the document field it is about.
 
-## Layout and controls (mobile + desktop)
-- **Landscape/desktop:** traveler booth on the left, desk with documents in the middle, rulebook and bulletin on the right.
-- **Portrait phone:** booth strip at the top, desk below it, rulebook as a pull-up drawer. Documents appear as a stack you swipe through, and tapping one opens it full width.
-- Pointer events everywhere (drag documents on desktop, tap and swipe on touch). Big APPROVE/DENY stamp buttons in the thumb zone.
-- Keyboard: `A` approve, `D` deny, `I` inspect, `R` rulebook, `Esc` pause.
-- `env(safe-area-inset-*)` padding for the notch and home bar in standalone mode, `100dvh`, no page scroll or zoom while playing, `touch-action: manipulation`.
-- Color tokens on `:root` with a dark theme, a 16px gutter at phone width, settings for reduced motion and sound.
+## 7. Multiplayer race ("who gets through the day fastest")
+All racers get the **same day**: same seed, rules, event and travelers. The race is a fixed number of travelers, which the host picks (8 / 12 / 16 / 20, default 12).
+- **Race time** = your own elapsed time **+ 10 s per mistake**. Lowest time wins. Detain/Inspect bonuses take 2 s off each.
+- **Result screen:** places, times, mistakes, and a "rematch" button that starts a new seed.
+- Menu gets a 4th mode card, **Race**, with two buttons: **Online** and **Same device**.
 
-## GitHub Pages URL
-Pages is enabled on the repo. The site URL is **https://dave098-1.github.io/passport-control-game/** (also shown under repo Settings → Pages → "Your site is live at…"). Right now `main` only has `README.md`, so the site shows the README or a 404 until phase 7 adds `index.html` and the deploy workflow and the branch is merged into `main`. The game's iOS gate will use this URL as its "install from here" link.
+**Refactor needed first:** the game screen is written for one player (global `S`, fixed element ids). It gets turned into a `Desk` component that holds its own state and renders into a container: booth, documents, stamp buttons and HUD. Solo modes use one `Desk`; split-screen uses two. The rulebook stays a shared panel. The engine needs no change, because travelers come from `makeDay(day, seed)` + `makeTraveler(c, rng(seed))`, so the same seed gives everyone identical travelers.
 
-## Implementation phases
-0. **Detection probe:** publish a tiny artifact that prints `userAgent`, `navigator.standalone`, `display-mode` and `window.top === window`. The user adds it to their Home Screen on an iPhone and reports what it shows. This decides the artifact-side gate behavior described above.
-1. **Shell + gate:** `index.html` with the platform detection, the install gate (all browser variants), the main menu, and the responsive desk layout with placeholders.
-2. **Engine:** seeded RNG, data, the traveler generator, the rules engine with the first 4 rules, a single shift with stamping and scoring.
-3. **Arcade mode:** all 10 rules, timer, citations, end-of-shift summary, high scores.
-4. **Endless mode** (reuses the engine; difficulty curve).
-5. **Story mode:** scene system, about 10 days of content, choices, endings, saved progress.
-6. **Polish:** SVG faces and documents, stamp animation, sounds, tutorial for day 1, accessibility (focus order, ARIA labels on stamps).
-7. **Installable app:** manifest, icons (`tools/gen-icons.js`), `sw.js`, README. Pages deploys straight from `main` (no workflow needed).
-8. **Publish:** commit and push to `claude/relaxed-euler-h7n9ce`, publish the artifact, and give both links.
+**Online race (Claude artifact version only)** uses the artifact's `room` capability (declared as `capabilities: {room: {}}`). No server of our own is needed.
+- **Lobby:**
+  - The host taps *Create race* and gets a 4-letter code. Others type the code, which joins `room.join("race-<code>")`.
+  - Everyone types a nickname, stored in their presence.
+  - The lobby lists who's in the race, with a "you" marker.
+- **Everything goes through presence, not events,** so it works for any viewer, not just editors.
+  - Host presence: `{role:"host", name, seed, day, count, go}`.
+  - Racer presence: `{name, ready, at, cites, done}`.
+  - When the host taps *Start*, it sets `go` to a new number. Each client sees it, runs a 3-2-1 countdown and starts its own clock.
+  - Finishers publish `done` (their race time). The live progress bars come from everyone's `at`.
+- **Who can play:** people signed in to claude.ai and either in your organization or invited to the artifact. Public-link visitors can't connect (a platform rule).
+  - If `claude.use("room")` returns null, the Online button shows "Online races work in the Claude version when it's shared with you".
+- **Not on GitHub Pages:** it has no server, so the Online button there explains that and links to the artifact. Adding Pages support later would need a hosted realtime service (for example Supabase) with an API key.
+
+**Same-device race (works everywhere, offline)**
+- **Split screen** on wide screens (≥ 900 px: computers, iPad landscape). 2 players get two `Desk`s side by side with the rulebook in the middle. Each half has its own Approve / Deny / Detain buttons, so two people can share an iPad. Keyboard: P1 `A` / `D` / `X`, P2 `←` / `→` / `↓`. Inspect and Ask are off in split screen to keep it fast.
+- **Pass-and-play** on phones (or by choice), for 2–6 players. Each player plays the same day in turn, with a "Hand the phone to <name>" screen in between. The final screen ranks everyone.
+
+## 8. More travelers per day
+- **Story:** days grow from 8 travelers to **10 on day 1, rising to 15 on day 10** (`10 + floor(day/2)`), plus the scripted characters.
+- **Arcade:** the gap between travelers drops from 1.3 s to **0.8 s** (Quick stamp upgrade: 0.4 s), so a 3-minute shift sees more people. Arrival speeds up a little through the shift. Rush hour doubles it.
+- **Endless:** starts at the faster pace as well.
+- **Race:** host picks 8–20.
+
+## Work order
+0. Refactor the game screen into a `Desk` component (no behavior change; existing tests must stay green).
+1. Engine: rules 9–14, diplomat exemptions, crime flag. Extend the engine test.
+2. 3-way decisions, Detain button, Ask panel and transcript, new document renderers (height chart, fingerprint, transit, letter, consent).
+3. Events.
+4. Wallet, shop screen, upgrades.
+5. Drag & compare.
+6. Coach marks, tutorial, new-rule tips.
+7. Story updates (Detain intro, day 9–10 rules, fixed events, Fenn flag, endings text, more travelers per day).
+8. Race: same-device split screen and pass-and-play, then the online race over `room`. Republish the artifact with `capabilities: {room: {}}`.
+9. Bump `VERSION` in `sw.js`. Update README and PLAN.md, rebuild the artifact (`node tools/build-artifact.js`) and republish it to the same URL, then commit and push.
 
 ## Verification
-- **Playwright (headless Chromium, already installed):** scripted runs of
-  - desktop 1280×800: menu → arcade shift → approve and deny → summary; no console errors,
-  - emulated `iPhone 15` (Safari UA): the gate is shown and the game does not start,
-  - the iPhone UA with `navigator.standalone = true` injected via `addInitScript`: the game starts,
-  - iPad UA (`MacIntel` + touch points) and the `CriOS` and Instagram UAs: the right gate variant shows,
-  - `Pixel 7` emulation: no gate; the portrait layout has no horizontal scroll,
-  - screenshots of each one, to look at the layout.
-- **Rules unit check:** a node script loads the engine section and generates 1,000 travelers per day, asserting that each planted discrepancy is caught by its rule and that valid travelers pass every rule.
-- **Real device (user):** on an iPhone, open the Pages URL in Safari → gate → Add to Home Screen → launch → game runs full screen, works offline after the first load.
+- `node tests/engine.test.js` covers days 1–20: valid travelers pass, every planted rule (new ones included) is caught, diplomats are exempt, and `crime` is set only for the crime rules.
+- `node tests/e2e.js` adds:
+  - Detain right and wrong;
+  - Ask → stay answer flagged with the ticket;
+  - buy the UV lamp → its toggle appears;
+  - event banner shows for a forced event;
+  - full tutorial run with real clicks;
+  - desktop drag moves a document and a field tap still flags;
+  - existing iOS gate and phone layout tests stay green.
+- Race tests:
+  - split screen with two players pressing their own keys;
+  - pass-and-play with 3 players, ranking correct with penalties;
+  - same seed gives identical travelers for both desks;
+  - with no `room` (Pages, plain browser), the Online button shows the explanation instead of failing.
+- The online race can only be tested for real inside claude.ai with two signed-in people. After publishing, I'll ask you to open the artifact on two devices, or share it with a friend, and run one race.
+- Screenshot check of desktop, iPhone and iPad layouts with the new buttons (no horizontal scroll, action bar fits at 393 px).
