@@ -610,7 +610,7 @@ const SB_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd
 const SB_SESSION='sb-gidygwjvmzvlkcmpdmyd-auth-token';
 /* Google's own sign-in pop-up (shows "Border Desk" instead of the Supabase address).
    Paste the Web OAuth Client ID here (public; never the client secret). Empty = use the redirect sign-in. */
-const GOOGLE_CLIENT_ID=window.__TEST_GOOGLE_ID||'';
+const GOOGLE_CLIENT_ID=window.__TEST_GOOGLE_ID||'862157398756-8cns40bes4piahbofscdm5dol0lmnd0c.apps.googleusercontent.com';
 const GSI_LIB='https://accounts.google.com/gsi/client';
 async function sha256hex(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
 async function setupGoogleButton(signup){
