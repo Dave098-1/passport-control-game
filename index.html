@@ -96,7 +96,8 @@ p{margin:0}
 .menu-foot{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- game screen ---------- */
-#game{padding:8px var(--gutter-r) 8px var(--gutter-l)}
+/* keep the top row (pause, day, date, timer, score) below the iPhone clock and the buttons above the home bar */
+#game{padding:calc(env(safe-area-inset-top,0px) + 8px) var(--gutter-r) calc(env(safe-area-inset-bottom,0px) + 8px) var(--gutter-l)}
 #game.solo{display:grid;grid-template-rows:minmax(0,1fr)}
 #game.split{display:grid;grid-template-columns:minmax(0,1fr) 250px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}
 .desk-root{position:relative;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:10px;min-height:0;min-width:0}
