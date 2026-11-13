@@ -5,11 +5,13 @@ A passport control game for desktop and mobile browsers. You are an officer at t
 **Play:** https://dave098-1.github.io/passport-control-game/
 
 ## Modes
-- **Story**: 10 days, 10–15 travelers a day, with recurring characters, bribes, a smuggler you can detain, and choices that lead to one of four endings.
+- **Story**: two chapters, 20 days, with a new rule every day.
+  - **Chapter 1, the Eastern Checkpoint (days 1–10):** recurring characters, bribes, a smuggler you can detain, and four endings.
+  - **Chapter 2, the Northern Pass (days 11–20):** Chief Holt, a smuggling ring, Mara's investigation, a wanted list, and four more endings that remember your Chapter 1 choices.
 - **Race**: everyone gets the same day and the same travelers. Fastest time wins; each mistake adds 10 s, each detain or flagged discrepancy takes off 2 s.
   - *Online*: create a race, share the 4-letter code, watch live progress bars. Works on GitHub Pages (through Supabase Realtime, no login needed) and in the Claude version.
   - *Same device*: split screen for 2 players on a computer or iPad, or pass-and-play for 2–6 players on a phone.
-- **Arcade**: 3-minute shifts. A new rule each day up to day 14. Streaks raise your score multiplier.
+- **Arcade**: 3-minute shifts. A new rule each day up to day 20. Streaks raise your score multiplier.
 - **Endless**: every rule at once, getting harder, until you make 3 mistakes.
 - **Tutorial**: a guided first shift with three travelers. Runs automatically the first time.
 
@@ -50,6 +52,7 @@ On iOS the game only runs from the Home Screen. Opening it in Safari or another 
 | `tools/build-artifact.js` | Makes the Claude artifact version of `index.html` (published with the `room`, `db` and `user` capabilities) |
 | `tests/engine.test.js` | Rules engine test (`node tests/engine.test.js`) |
 | `tests/e2e.js` | Browser tests with Playwright (`node tests/e2e.js`) |
+| `tests/chapter2.e2e.js` | Chapter 2: start, bag check with a smuggler, wanted list, ending (`node tests/chapter2.e2e.js`) |
 | `tests/race-online.e2e.js` | Two-player online race over a stand-in for Supabase Realtime (`node tests/race-online.e2e.js`) |
 | `tests/accounts.e2e.js` | Account and sync tests against a stand-in Supabase (`node tests/accounts.e2e.js`) |
 

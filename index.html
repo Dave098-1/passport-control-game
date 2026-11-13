@@ -96,7 +96,8 @@ p{margin:0}
 .menu-foot{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- game screen ---------- */
-#game{padding:8px var(--gutter-r) 8px var(--gutter-l)}
+/* keep the top row (pause, day, date, timer, score) below the iPhone clock and the buttons above the home bar */
+#game{padding:calc(env(safe-area-inset-top,0px) + 8px) var(--gutter-r) calc(env(safe-area-inset-bottom,0px) + 8px) var(--gutter-l)}
 #game.solo{display:grid;grid-template-rows:minmax(0,1fr)}
 #game.split{display:grid;grid-template-columns:minmax(0,1fr) 250px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}
 .desk-root{position:relative;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:10px;min-height:0;min-width:0}
@@ -207,6 +208,17 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 .desk.uv .seal-btn.fake,.desk.uv .doc.letter.fake{box-shadow:0 0 0 3px #ff3df5,0 0 18px #ff3df5}
 .desk.uv .doc.passport.genuine .pp-body::after{content:"VBA \2713";position:absolute;right:10px;bottom:6px;font:800 22px var(--display);color:rgba(110,40,200,.55);transform:rotate(-8deg)}
 
+/* chapter 2 papers */
+.doc.declaration{background:#f2efe6}.doc.declaration header{background:#6b5a2e}
+.sig-f svg{width:120px;height:36px;display:block}
+.bag-scan{display:block!important;font-size:13px;line-height:1.4}
+.bag-scan .lbl{display:block}
+.posters{display:flex;gap:8px;flex-wrap:wrap}
+.poster{background:var(--paper);color:var(--ink);border-radius:8px;padding:6px;width:100px;display:grid;gap:4px;text-align:center;font:600 11px var(--mono)}
+.poster span{color:#b4392b;letter-spacing:.14em;font-weight:800}
+.poster svg{width:100%;height:auto;background:#c9d3d8;border-radius:4px}
+.desk.dark.snow .doc:not(.lit){filter:blur(5px) brightness(1.15) saturate(.4)}
+.desk.snow{background:repeating-linear-gradient(90deg,#4a4d55 0 2px,#545862 2px 7px)}
 /* inspect mode */
 .inspecting .f{cursor:pointer;border-color:rgba(90,163,214,.55)}
 .f.sel{border-color:var(--info)!important;border-style:solid!important;box-shadow:0 0 0 3px rgba(90,163,214,.45)}
@@ -404,6 +416,9 @@ const DISTRICTS=['North Ward','Riverside','Old Quarter','Harbor'];
 const BAD_DISTRICTS=['Lowmarsh','East Gate','Pinecross'];
 const SEALS=['sun','tower','wave'], BAD_SEALS=['crown','key','moon'];
 const EVENTS=['rush','inspector','vip','power'];
+const EMPLOYERS=['Brask Mill','Harbor Authority','Vey Ironworks','Ollen Rail'], BAD_EMPLOYERS=['Kessler Imports','Northwind Freight','Grey Pine Co.'];
+const GOODS=['clothes','toothbrush','novel','camera','phone charger','snacks','umbrella','laptop','scarf','map','tea tin','sketchbook','sweater','headphones'];
+const CONTRABAND=['seeds','medicine','weapon parts','live birds','Zemoran cigarettes','gold bars','radio transmitter','fireworks'];
 const RULES=[
   {id:'expiry',day:1,short:'Expiry date',text:'Passports must not be expired.'},
   {id:'photo',day:1,short:'Photo',text:'The passport photo must match the traveler.'},
@@ -420,7 +435,13 @@ const RULES=[
   {id:'fingerprint',day:11,short:'Fingerprint',text:'Ask workers for a fingerprint. It must match the one on the work pass.'},
   {id:'transit',day:12,short:'Transit slip',text:'Transit travelers need a transit slip leaving within 2 days of today.'},
   {id:'diplomat',day:13,short:'Embassy letter',text:'Diplomats skip the ticket, vaccine and closed-country rules, but need an embassy letter from their own country.'},
-  {id:'consent',day:14,short:'Guardian consent',text:'Travelers under 18 need a guardian consent form. The guardian’s surname must match theirs.'}
+  {id:'consent',day:14,short:'Guardian consent',text:'Travelers under 18 need a guardian consent form. The guardian\u2019s surname must match theirs.'},
+  {id:'idexpiry',day:15,short:'ID expiry',text:'Citizens\u2019 ID cards must not be expired.'},
+  {id:'sponsor',day:16,short:'Employer',text:'Work passes must name a registered employer.'},
+  {id:'contraband',day:17,short:'Bag (ask)',text:'Ask to see every bag. Anyone carrying today\u2019s banned goods is a smuggler: detain them.'},
+  {id:'declaration',day:18,short:'Cash declaration',text:'Anyone carrying more than 5,000 cr needs a customs declaration for the exact amount.'},
+  {id:'wanted',day:19,short:'Wanted list',text:'Detain anyone on the police wanted list.'},
+  {id:'signature',day:20,short:'Signature',text:'The entry ticket signature must match the passport signature.'}
 ];
 const LINES={
   visit:['Just visiting family.','A short holiday, nothing more.','I’m here to see the coast.','Visiting a friend in Ollen.','My sister is getting married.'],
@@ -455,7 +476,7 @@ const CHECK={
   ticket:(t,c)=>{if(!foreign(t)||t.docs.passport.diplomat)return null;const d=t.docs;
     if(!d.ticket)return I('ticket','No entry ticket.',['rule.ticket','passport.country'],'The ticket office was closed!');
     if(d.ticket.date!==c.today)return I('ticket','The entry ticket is for a different day.',['ticket.date','desk.date'],'I bought it for the wrong day?');return null;},
-  names:(t)=>{const d=t.docs;for(const k of ['ticket','work','vaccine','id','transit','letter','consent'])if(d[k]&&d[k].name!==d.passport.name)
+  names:(t)=>{const d=t.docs;for(const k of ['ticket','work','vaccine','id','transit','letter','consent','declaration'])if(d[k]&&d[k].name!==d.passport.name)
     return I('names','A name doesn’t match the passport.',[k+'.name','passport.name'],'A clerk must have misspelled it.');return null;},
   workpass:(t)=>{if(!foreign(t)||t.purpose!=='work')return null;const d=t.docs;
     if(!d.work)return I('workpass','A foreign worker without a work pass.',['rule.workpass','booth.purpose'],'My employer said I didn’t need one.');
@@ -480,14 +501,22 @@ const CHECK={
     if(d.letter.country!==d.passport.country)return I('diplomat','The embassy letter is from the wrong country. A forgery.',['letter.country','passport.country'],'Our embassies share an office.',true);return null;},
   consent:(t,c)=>{if(!isMinor(t,c))return null;const d=t.docs;
     if(!d.consent)return I('consent','A minor without a guardian consent form.',['rule.consent','passport.dob'],'My mum is meeting me on the other side!');
-    if(surname(d.consent.guardian)!==surname(d.passport.name))return I('consent','The guardian’s surname doesn’t match.',['consent.guardian','passport.name'],'She’s my aunt. It’s complicated.');return null;}
+    if(surname(d.consent.guardian)!==surname(d.passport.name))return I('consent','The guardian’s surname doesn’t match.',['consent.guardian','passport.name'],'She\u2019s my aunt. It\u2019s complicated.');return null;},
+  idexpiry:(t,c)=>t.docs.id&&t.docs.id.expiry<c.today?I('idexpiry','The ID card is expired.',['id.expiry','desk.date'],'I meant to renew it this week.'):null,
+  sponsor:(t)=>t.docs.work&&!EMPLOYERS.includes(t.docs.work.employer)?I('sponsor','The employer isn\u2019t registered.',['work.employer','rule.sponsor'],'They\u2019re a new company. Very new.'):null,
+  contraband:(t,c)=>t.bag.some(i=>c.contraband.includes(i))?I('contraband','Banned goods in the bag. A smuggler.',['booth.bag','rule.contraband'],'Someone must have put that in my bag!',true):null,
+  declaration:(t)=>{if(t.cash<=5000)return null;const d=t.docs;
+    if(!d.declaration)return I('declaration','Over 5,000 cr in cash with no declaration.',['booth.bag','rule.declaration'],'It\u2019s my savings. I didn\u2019t know.');
+    if(d.declaration.amount!==t.cash)return I('declaration','The declared amount doesn\u2019t match the cash.',['declaration.amount','booth.bag'],'I must have counted wrong.');return null;},
+  wanted:(t,c)=>c.wanted.some(w=>w.name===t.docs.passport.name)?I('wanted','This person is on the wanted list.',['passport.name','rule.wanted'],'That poster isn\u2019t me. Look closer!',true):null,
+  signature:(t)=>t.docs.ticket&&t.docs.ticket.sig!==t.docs.passport.sig?I('signature','The ticket signature doesn\u2019t match the passport. A forgery.',['ticket.sig','passport.sig'],'My hand was cold when I signed it.',true):null
 };
 const PLANT={
   expiry:(t,c,r)=>{t.docs.passport.expiry=c.today-r.int(1,300);return true;},
   photo:(t,c,r)=>{t.docs.passport.face=mutateFace(t.face,r);return true;},
   city:(t,c,r)=>{const p=t.docs.passport;const o=r.pick(Object.keys(COUNTRIES).filter(k=>k!==p.country));p.city=r.pick(COUNTRIES[o]);return true;},
   ticket:(t,c,r)=>{const d=t.docs;if(!foreign(t)||!d.ticket)return false;if(r.chance(.5))delete d.ticket;else d.ticket.date=c.today+(r.chance(.5)?1:-1)*r.int(1,20);return true;},
-  names:(t,c,r,o)=>{const ks=['ticket','work','vaccine','id','transit','letter','consent'].filter(k=>t.docs[k]);if(!ks.length)return false;const k=r.pick(ks);t.docs[k].name=alterName(t.docs.passport.name,r,o&&o.subtle);return true;},
+  names:(t,c,r,o)=>{const ks=['ticket','work','vaccine','id','transit','letter','consent','declaration'].filter(k=>t.docs[k]);if(!ks.length)return false;const k=r.pick(ks);t.docs[k].name=alterName(t.docs.passport.name,r,o&&o.subtle);return true;},
   workpass:(t,c,r)=>{const d=t.docs;if(!d.work)return false;if(r.chance(.5))delete d.work;else d.work.number=alterNumber(d.work.number,r);return true;},
   seal:(t,c,r)=>{if(!t.docs.work)return false;t.docs.work.seal=r.pick(BAD_SEALS);return true;},
   banned:(t,c,r)=>{if(!foreign(t)||!c.banned||t.docs.passport.diplomat||t.docs.passport.country===c.banned)return false;setCountry(t,c.banned,r);return true;},
@@ -501,13 +530,24 @@ const PLANT={
   diplomat:(t,c,r)=>{const d=t.docs;if(!d.passport.diplomat||!d.letter)return false;
     if(r.chance(.4))delete d.letter;else d.letter.country=r.pick(FOREIGN.filter(x=>x!==d.passport.country));return true;},
   consent:(t,c,r)=>{const d=t.docs;if(!d.consent)return false;if(r.chance(.5))delete d.consent;
-    else{let l;do{l=r.pick(LAST);}while(l===surname(d.passport.name));d.consent.guardian=d.consent.guardian.split(' ')[0]+' '+l;}return true;}
+    else{let l;do{l=r.pick(LAST);}while(l===surname(d.passport.name));d.consent.guardian=d.consent.guardian.split(' ')[0]+' '+l;}return true;},
+  idexpiry:(t,c,r)=>{if(!t.docs.id)return false;t.docs.id.expiry=c.today-r.int(1,400);return true;},
+  sponsor:(t,c,r)=>{if(!t.docs.work)return false;t.docs.work.employer=r.pick(BAD_EMPLOYERS);return true;},
+  contraband:(t,c,r)=>{if(!c.contraband.length)return false;t.bag.splice(r.int(0,t.bag.length),0,r.pick(c.contraband));return true;},
+  declaration:(t,c,r)=>{const d=t.docs;if(t.cash<=5000){t.cash=r.int(51,200)*100;delete d.declaration;return true;}
+    if(!d.declaration||r.chance(.4))delete d.declaration;else d.declaration.amount=t.cash+(r.chance(.5)?1:-1)*r.int(1,20)*100;return true;},
+  wanted:(t,c,r)=>{if(!c.wanted.length)return false;const w=r.pick(c.wanted);setName(t,w.name);t.face=Object.assign({},w.face);t.docs.passport.face=Object.assign({},w.face);return true;},
+  signature:(t,c,r)=>{if(!t.docs.ticket)return false;let s;do{s=r.int(1,99999);}while(s===t.docs.passport.sig);t.docs.ticket.sig=s;return true;}
 };
+function setName(t,name){t.name=name;for(const k of Object.keys(t.docs))if(t.docs[k].name!=null)t.docs[k].name=name;
+  if(t.docs.consent)t.docs.consent.guardian=t.docs.consent.guardian.split(' ')[0]+' '+surname(name);}
 function makeDay(day,seed,over){over=over||{};const r=rng((seed^Math.imul(day,7919))>>>0);
   const rules=new Set(RULES.filter(x=>x.day<=day).map(x=>x.id));
   const c={day,today:over.today||day,rules,banned:null,vaccine:[],event:null,vipAt:r.int(2,6)};
   if(rules.has('banned'))c.banned=over.banned||r.pick(FOREIGN);
   if(rules.has('vaccine'))c.vaccine=over.vaccine||r.shuffle(FOREIGN.filter(x=>x!==c.banned)).slice(0,2);
+  c.contraband=rules.has('contraband')?(over.contraband||r.shuffle(CONTRABAND).slice(0,3)):[];
+  c.wanted=rules.has('wanted')?(over.wanted||[0,1].map(()=>({name:r.pick(FIRST)+' '+r.pick(LAST),face:randFace(r)}))):[];
   const roll=r.f(),pick=r.pick(EVENTS);
   c.event='event' in over?over.event:(day>=3&&roll<.4?pick:null);
   return c;}
@@ -520,27 +560,31 @@ function makeTraveler(c,r,o){o=o||{};const R=c.rules;
   const purpose=o.purpose||(citizen?'return':diplomat?'diplomatic':(R.has('transit')&&r.chance(.2)?'transit':(r.chance(.35)?'work':'visit')));
   const minor=R.has('consent')&&!diplomat&&purpose!=='work'&&r.chance(.12);
   const face=o.face||randFace(r);
-  const name=o.name||(r.pick(FIRST)+' '+r.pick(LAST));
+  let name=o.name||(r.pick(FIRST)+' '+r.pick(LAST));
+  while(!o.name&&c.wanted.some(w=>w.name===name))name=r.pick(FIRST)+' '+r.pick(LAST);
   const dob=minor?c.today-r.int(8*YEAR,17*YEAR):c.today-r.int(18*YEAR,75*YEAR);
   const height=minor?r.int(125,170):r.int(152,198);
   const print={type:r.int(0,2),v:r.int(0,3)};
   const pp={name,country,city:r.pick(COUNTRIES[country]),number:CODES[country]+'-'+r.int(10000,99999),dob,expiry:c.today+r.int(20,3000),face:Object.assign({},face),height};
   if(diplomat)pp.diplomat=true;
+  pp.sig=r.int(1,99999);
+  const bag=r.shuffle(GOODS).slice(0,r.int(2,4)),cash=r.chance(.2)?r.int(51,200)*100:r.int(2,40)*100;
   const d={passport:pp};
-  if(!citizen&&!diplomat&&R.has('ticket'))d.ticket={name,date:c.today,stay:r.int(2,30)};
-  if(!citizen&&purpose==='work'&&R.has('workpass'))d.work={name,number:pp.number,seal:r.pick(SEALS),until:c.today+r.int(30,700),print:Object.assign({},print)};
+  if(!citizen&&!diplomat&&R.has('ticket'))d.ticket={name,date:c.today,stay:r.int(2,30),sig:pp.sig};
+  if(!citizen&&purpose==='work'&&R.has('workpass'))d.work={name,number:pp.number,seal:r.pick(SEALS),until:c.today+r.int(30,700),print:Object.assign({},print),employer:r.pick(EMPLOYERS)};
   if(!diplomat&&R.has('vaccine')&&c.vaccine.includes(country))d.vaccine={name,number:pp.number,date:c.today-r.int(5,300)};
-  if(citizen&&R.has('idcard'))d.id={name,dob,district:r.pick(DISTRICTS)};
+  if(citizen&&R.has('idcard'))d.id={name,dob,district:r.pick(DISTRICTS),expiry:c.today+r.int(30,3000)};
+  if(cash>5000&&R.has('declaration'))d.declaration={name,amount:cash};
   if(purpose==='transit')d.transit={name,until:c.today+r.int(0,2)};
   if(diplomat)d.letter={name,country};
   if(minor)d.consent={name,guardian:r.pick(FIRST)+' '+surname(name)};
-  const t={name,country,purpose,face,height,print,docs:d,planted:[],answers:{stay:d.ticket?d.ticket.stay:null}};
+  const t={name,country,purpose,face,height,print,bag,cash,docs:d,planted:[],answers:{stay:d.ticket?d.ticket.stay:null}};
   const p=o.p!=null?o.p:0.4;
   if(r.chance(p)){let n=r.chance(.2)?2:1;for(const id of r.shuffle([...R])){if(n<=0)break;if(PLANT[id](t,c,r,o)){t.planted.push(id);n--;}}}
   finalize(t,c);
   t.say=r.pick(LINES[purpose]);
   return t;}
-G.BD={fmtDate,rng,HOME,COUNTRIES,CODES,FOREIGN,DISTRICTS,BAD_DISTRICTS,SEALS,BAD_SEALS,EVENTS,RULES,CHECK,PLANT,makeDay,makeTraveler,audit,finalize,sameFace,samePrint,alterName,alterNumber,isMinor,surname,YEAR};
+G.BD={EMPLOYERS,CONTRABAND,setName,fmtDate,rng,HOME,COUNTRIES,CODES,FOREIGN,DISTRICTS,BAD_DISTRICTS,SEALS,BAD_SEALS,EVENTS,RULES,CHECK,PLANT,makeDay,makeTraveler,audit,finalize,sameFace,samePrint,alterName,alterNumber,isMinor,surname,YEAR};
 })(typeof window!=='undefined'?window:globalThis);
 </script>
 
@@ -928,6 +972,60 @@ const STORY={
         choice:{text:'He slides 200 crowns under the glass.',options:[{label:'Take the money',fn:(F,D)=>{F.bribes++;D.score+=200;}},{label:'Push it back',fn:()=>{}}]}}]
   }
 };
+/* ----- Chapter 2: the Northern Pass (days 11-20), one new rule a day ----- */
+const HOLT='Chief Holt', TOMAS='Tomas, booth two';
+const EDDA_FACE={skin:1,hair:1,hc:0,eyes:2,glasses:false,beard:false,shape:2,shirt:3};
+Object.assign(STORY.intro,{
+  11:[[HOLT,'Welcome to the Northern Pass. I\u2019m Chief Holt. Brel says you\u2019re careful, and up here you\u2019ll need to be.'],[HOLT,'New rule: workers carry their fingerprint on their pass. Ask for a print and compare.'],[TOMAS,'Tomas. Booth two. Bring a scarf, the heaters don\u2019t work.']],
+  12:[[HOLT,'Trains cross the pass now. Transit travelers need a transit slip leaving within two days.'],[TOMAS,'And it\u2019s rush hour all day. Good luck.']],
+  13:[[HOLT,'Diplomats use this pass. They skip tickets, vaccine slips and the closed list, but must carry a letter from their own embassy.']],
+  14:[[HOLT,'Families are coming through for the holidays. Anyone under 18 needs a guardian consent form.'],[HOLT,'A Ministry inspector is sitting in today. Mistakes count double.']],
+  15:[[HOLT,'Citizens\u2019 ID cards now carry an expiry date. An expired card is a deny.']],
+  16:[[HOLT,'Only four employers may sponsor workers. The list is in your rulebook.'],[TOMAS,'Blizzard\u2019s coming in. The papers ice over, so tap them to wipe them clean.']],
+  17:[[HOLT,'Smuggling through the pass is getting worse. Ask everyone to open their bag. Today\u2019s banned goods are in the rulebook, and smugglers get detained.'],[TOMAS,'Someone\u2019s paying well to get things through here.']],
+  18:[[HOLT,'Anyone carrying more than 5,000 crowns in cash needs a customs declaration for the exact amount. The bag check shows their cash.'],[TOMAS,'Generator\u2019s down again. Torches out.']],
+  19:[[HOLT,'The police sent a wanted list. If a face from the poster walks up, detain them.']],
+  20:[[HOLT,'Last day of the season. Ticket signatures must match the passport. If the ring tries anything, it\u2019ll be today.']]
+});
+Object.assign(STORY.over,{11:{event:null},12:{banned:'Ostrand',event:'rush'},13:{event:null},14:{event:'inspector'},15:{event:null},
+  16:{banned:'Corvel',event:'blizzard'},17:{banned:'Tirrin',event:null,contraband:['seeds','gold bars','radio transmitter']},18:{banned:'Ostrand',event:'power'},
+  19:{banned:'Pelagia',event:null,wanted:[{name:'Edda Varga',face:EDDA_FACE},{name:'Bors Kral',face:{skin:3,hair:3,hc:4,eyes:0,glasses:true,beard:true,shape:1,shirt:1}}]},20:{banned:'Lumeno',event:null}});
+Object.assign(STORY.scripted,{
+  12:[{at:2,name:'Mara Tellen',country:'Lumeno',purpose:'visit',say:F=>F.mara?'Mara again. You let me in once; this time my papers are perfect. I followed a smuggling story up the mountain.':'Mara Tellen, Lumeno Herald. I followed a smuggling story up here. Somebody is moving goods through this pass.'}],
+  14:[{at:3,name:'Ivo Petrak',country:'Veldmark',purpose:'return',skip:F=>F.reported!==true,say:'They moved me to the supply depot up here. No hard feelings, officer. Mostly.'}],
+  15:[{at:3,name:'Pavel Desh',country:'Veldmark',purpose:'return',mutate:(t,c)=>{if(t.docs.id)t.docs.id.expiry=c.today-12;},
+      say:F=>F.anni==='in'?'My ID ran out last week. Anni is waiting for me on the other side of the valley. Please.':'My ID ran out last week, and I\u2019m still trying to bring my wife home. Please.',
+      decide:(k,F)=>{if(k==='approve')F.mercy2++;}}],
+  16:[{at:4,name:'Fenn Kovac',country:'Zemora',purpose:'work',skip:F=>F.fennCaught,mutate:t=>{t.docs.work.employer='Kessler Imports';},
+      say:'Remember me? New mountain, new job. Kessler Imports, very respectable. And something for the cold\u2026',
+      choice:{text:'He slides 150 crowns under the glass.',options:[{label:'Take the money',fn:(F,D)=>{F.bribes2++;D.score+=150;}},{label:'Push it back',fn:()=>{}}]}},
+     {at:4,name:'Lena Kovac',country:'Zemora',purpose:'work',skip:F=>!F.fennCaught,mutate:t=>{t.docs.work.employer='Kessler Imports';},
+      say:'You locked up my brother Fenn. I only want to work. Kessler Imports hired me, they said it was all legal.'}],
+  17:[{at:3,name:'Oskar Brandt',country:'Pelagia',purpose:'visit',mutate:(t,c)=>{t.bag.splice(1,0,c.contraband[0]);},say:'Just visiting. Nothing to declare.',
+      choice:{text:'Your phone buzzes. Mara: \u201cThe man at your window carries goods for the ring. Let him through and I can follow him to the leaders.\u201d',
+        options:[{label:'Let him through for Mara',fn:F=>{F.ringPlan=true;}},{label:'Do it by the book',fn:F=>{F.ringPlan=false;}}]},
+      decide:(k,F)=>{if(k==='approve'&&F.ringPlan)F.ring=true;}}],
+  18:[{at:4,name:'Greta Orsini',country:'Corvel',purpose:'visit',mutate:t=>{t.cash=9000;delete t.docs.declaration;},say:'Holiday money. Lots of holiday.',
+      choice:{text:'She pushes 200 crowns across: \u201cForget the declaration.\u201d',options:[{label:'Take the money',fn:(F,D)=>{F.bribes2++;D.score+=200;}},{label:'Push it back',fn:()=>{}}]}}],
+  19:[{at:3,name:'Edda Varga',country:'Tirrin',purpose:'visit',face:EDDA_FACE,say:'That poster is wrong. The ring framed me because I talked to Mara. Please, I have proof in Avra.',
+      decide:(k,F)=>{F.edda=k==='approve'?'in':k==='detain'?'held':'out';if(k==='approve')F.mercy2++;}}],
+  20:[{at:5,name:'Fenn Kovac',country:'Zemora',purpose:'visit',skip:F=>F.fennCaught,mutate:(t,c,r)=>{if(t.docs.ticket)t.docs.ticket.sig=t.docs.passport.sig+7;},
+      say:'Last run of the season, officer. Three hundred crowns, and nobody checks a signature in the snow.',decide:(k,F)=>{if(k==='detain')F.fennCaught=true;},
+      choice:{text:'He slides 300 crowns under the glass.',options:[{label:'Take the money',fn:(F,D)=>{F.bribes2++;D.score+=300;}},{label:'Push it back',fn:()=>{}}]}},
+     {at:5,name:'Lena Kovac',country:'Zemora',purpose:'visit',skip:F=>!F.fennCaught,mutate:(t,c,r)=>{if(t.docs.ticket)t.docs.ticket.sig=t.docs.passport.sig+7;},
+      say:'One last trip for the ring, then I\u2019m out. Please don\u2019t look too closely.'}]
+});
+function storyEnding2(st){
+  const F=st.flags;
+  if(st.cites>=20)return['Dismissed','Too many citations at the Northern Pass. Holt sends you back down the mountain with your stamp in a box.'];
+  if(F.bribes2>0)return['Mountain Fortune','The ring pays well, and the pass gets busier every week. One night the police come for the smugglers, and for their friends at the checkpoint.'];
+  if(F.ring)return['The Ring Breaks','Mara followed the courier all the way to a warehouse in Koba. Her story names the ring\u2019s leaders, and the police take them the same night. Holt pins a medal on your coat.'+(F.edda==='in'?' Edda Varga is cleared a week later.':'')];
+  return['Keeper of the Pass',(F.mercy2>0?'You bent the rules for people who needed it, and the valley remembers. ':'')+'Holt retires in spring and hands you the keys to the Northern Pass.'+(F.fennCaught?' The Kovacs never smuggle again.':'')];
+}
+function startChapter2(){
+  const base=SV.storyCh1?SV.storyCh1.flags:{mercy:0,bribes:0,reported:null,anni:null,mara:false,fennCaught:false};
+  SV.story={day:11,seed:rand32(),flags:Object.assign({},base,{ring:false,ringPlan:false,bribes2:0,mercy2:0,edda:null}),pay:0,cites:0,chapter:2};persist();storyDay();
+}
 function storyEnding(st){
   const F=st.flags,fenn=F.fennCaught?' Fenn Kovac sits in a cell in Brask because of you.':'';
   if(st.cites>=15)return['Dismissed','Your record has too many citations. The Ministry ends your probation, and you hand in your stamp at the gate you used to guard.'];
@@ -940,7 +1038,8 @@ function storyEnding(st){
 const EVENT_INFO={rush:['Rush hour','A two-minute shift. Travelers come twice as fast, and points count ×1.5.'],
   inspector:['Inspector visit','A Ministry inspector is watching. Correct calls and citations both count double.'],
   vip:['VIP crossing','Someone important comes through today. Don’t let them push you around.'],
-  power:['Power cut','The desk lights are out. Tap a document to light it with your torch for 4 seconds.']};
+  power:['Power cut','The desk lights are out. Tap a document to light it with your torch for 4 seconds.'],
+  blizzard:['Blizzard','Snow ices over the papers. Tap a document to wipe it clean for 4 seconds.']};
 const SHOP=[
   {id:'quick',name:'Quick stamp',price:80,text:'The next traveler steps up almost at once.'},
   {id:'checklist',name:'Checklist card',price:100,text:'Shows which rules apply to the traveler in front of you.'},
@@ -954,6 +1053,10 @@ function overlay(html,cls){const c=$('overlay-card');c.className='card'+(cls?' '
 function closeOverlay(){$('overlay').hidden=true;}
 function show(id){for(const s of ['menu','game'])$(s).hidden=s!==id;}
 let PAUSED=false, DESKS=[];
+const CR=n=>Number(n).toLocaleString('en-US')+' cr';
+function sigSVG(seed){const r=BD.rng(seed);let x=6,y=20,d=`M${x} ${y}`;for(let i=0;i<6;i++){const nx=x+r.int(10,17),ny=r.int(6,30);d+=`Q${x+r.int(2,10)} ${r.int(0,36)} ${nx} ${ny}`;x=nx;y=ny;}
+  d+=`M${r.int(10,30)} ${r.int(26,32)}L${r.int(60,92)} ${r.int(24,34)}`;return `<svg viewBox="0 0 100 36" aria-hidden="true"><path d="${d}" fill="none" stroke="#24408f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;}
+const SIG=(key,seed)=>`<button type="button" class="f sig-f" data-key="${key}"><span class="lbl">Signature</span>${sigSVG(seed)}</button>`;
 function F(key,label,val){return `<button type="button" class="f" data-key="${key}"><span class="lbl">${label}</span><span class="val">${esc(val)}</span></button>`;}
 function applicable(t,c){const d=t.docs,p=d.passport,f=p.country!==BD.HOME,R=id=>c.rules.has(id),L=[];
   if(R('expiry'))L.push('Expiry');if(R('photo'))L.push('Photo');if(R('city'))L.push('Issuing city');
@@ -962,19 +1065,24 @@ function applicable(t,c){const d=t.docs,p=d.passport,f=p.country!==BD.HOME,R=id=
   if(R('banned')&&f&&!p.diplomat)L.push('Closed country');if(R('vaccine')&&c.vaccine.includes(p.country)&&!p.diplomat)L.push('Vaccine slip');
   if(R('idcard')&&!f)L.push('ID card');if(R('stay')&&d.ticket)L.push('Stay (ask)');if(R('height'))L.push('Height');
   if(R('fingerprint')&&d.work)L.push('Fingerprint (ask)');if(R('transit')&&t.purpose==='transit')L.push('Transit slip');
-  if(R('diplomat')&&p.diplomat)L.push('Embassy letter');if(R('consent')&&BD.isMinor(t,c))L.push('Guardian consent');return L;}
+  if(R('diplomat')&&p.diplomat)L.push('Embassy letter');if(R('consent')&&BD.isMinor(t,c))L.push('Guardian consent');
+  if(R('idexpiry')&&d.id)L.push('ID expiry');if(R('sponsor')&&d.work)L.push('Employer');if(R('contraband'))L.push('Bag (ask)');
+  if(R('declaration'))L.push('Cash (ask)');if(R('wanted'))L.push('Wanted list');if(R('signature')&&d.ticket)L.push('Signature');return L;}
 
 /* ================= rulebook (shared) ================= */
 function renderBook(c,newDay){
   let h=`<h3>Bulletin · ${BD.fmtDate(c.today)}</h3>`;
   if(c.event)h+=`<div class="small-note"><b style="color:var(--lamp)">${EVENT_INFO[c.event][0]}:</b> ${EVENT_INFO[c.event][1]}</div>`;
-  for(const r of BD.RULES){if(!c.rules.has(r.id))continue;
+  for(const r of BD.RULES.slice().reverse()){if(!c.rules.has(r.id))continue; // newest rules first
     let extra='';
     if(r.id==='city')extra='<table>'+Object.entries(BD.COUNTRIES).map(([k,v])=>`<tr><td>${k}</td><td>${v.join(', ')}</td></tr>`).join('')+'</table>';
     if(r.id==='seal')extra=`<div class="seals">${BD.SEALS.map(sealSVG).join('')}</div><span class="small-note">Sun · Tower · Wave</span>`;
     if(r.id==='banned')extra=`<b style="color:var(--deny);font-family:var(--mono)">Closed today: ${c.banned}</b>`;
     if(r.id==='vaccine')extra=`<span style="font-family:var(--mono)">Slip required from: <b>${c.vaccine.join(', ')}</b></span>`;
     if(r.id==='idcard')extra=`<span class="small-note">Valid districts: ${BD.DISTRICTS.join(', ')}</span>`;
+    if(r.id==='sponsor')extra=`<span class="small-note">Registered: ${BD.EMPLOYERS.join(', ')}</span>`;
+    if(r.id==='contraband')extra=`<b style="color:var(--deny);font-family:var(--mono)">Banned today: ${c.contraband.join(', ')}</b>`;
+    if(r.id==='wanted')extra=`<div class="posters">${c.wanted.map(w=>`<div class="poster"><span>WANTED</span>${faceSVG(w.face)}<b>${esc(w.name)}</b></div>`).join('')}</div>`;
     const isNew=newDay&&r.day===newDay;
     h+=`<button type="button" class="rule f${isNew?' new':''}" data-key="rule.${r.id}" data-rule="${r.id}">${isNew?'<span class="tag">NEW TODAY</span>':''}<span>${r.text}</span>${extra}</button>`;
   }
@@ -1061,7 +1169,7 @@ class Desk{
     if(this.mode==='tutorial'){t=this.queue[this.idx++](this);}
     else if(this.mode==='story'){
       const F=SV.story.flags;let spec=this.queue[this.idx++];if(spec&&spec.skip&&spec.skip(F))spec=null;
-      if(spec){t=BD.makeTraveler(c,this.r,{p:0,name:spec.name,country:spec.country,purpose:spec.purpose});
+      if(spec){t=BD.makeTraveler(c,this.r,{p:0,name:spec.name,country:spec.country,purpose:spec.purpose,face:spec.face});
         if(spec.mutate)spec.mutate(t,c,this.r);BD.finalize(t,c);t.say=typeof spec.say==='function'?spec.say(F):spec.say;t.spec=spec;}
       else t=BD.makeTraveler(c,this.r,{p:Math.min(.5,.3+c.day*.02)});
     }else{
@@ -1084,7 +1192,7 @@ class Desk{
   }
   applyEvent(){
     const ev=this.c.event,chip=this.q('.hud-event');chip.hidden=!ev;if(ev)chip.textContent=EVENT_INFO[ev][0];
-    this.q('.desk').classList.toggle('dark',ev==='power'&&!this.uv);
+    this.q('.desk').classList.toggle('dark',(ev==='power'||ev==='blizzard')&&!this.uv);this.q('.desk').classList.toggle('snow',ev==='blizzard');
   }
   renderTraveler(){
     const t=this.t,d=t.docs,p=d.passport,c=this.c,R=id=>c.rules.has(id);
@@ -1094,7 +1202,7 @@ class Desk{
     this.q('.purpose').textContent='Purpose: '+NAMES[t.purpose];
     const hc=this.q('.height');hc.hidden=!R('height');hc.textContent=`Height chart: ${t.height} cm`;
     const am=this.q('.ask-menu');if(am){am.hidden=true;this.q('.transcript').innerHTML='';
-      const qs=[['purpose','What brings you here?'],['stay','How long are you staying?'],['where','Where will you stay?']];if(R('fingerprint'))qs.push(['print','Fingerprint, please.']);
+      const qs=[['purpose','What brings you here?'],['stay','How long are you staying?'],['where','Where will you stay?']];if(R('fingerprint'))qs.push(['print','Fingerprint, please.']);if(R('contraband')||R('declaration'))qs.push(['bag','Open your bag, please.']);
       am.innerHTML=qs.map(([k,txt])=>`<button class="btn small" type="button" data-q="${k}">${txt}</button>`).join('');
       am.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>this.ask(b.dataset.q,b));}
     const cl=this.q('.checklist');cl.hidden=!SV.upgrades.checklist||this.mode==='race';
@@ -1102,14 +1210,15 @@ class Desk{
     const diplo=p.diplomat,genuine=BD.COUNTRIES[p.country].includes(p.city);
     let h=`<article class="doc passport${genuine?' genuine':''}" style="--cover:${diplo?'#a8842c':COVER[p.country]}"><header><span>${esc(p.country.toUpperCase())}</span><b>${diplo?'Diplomatic passport':'Passport'}</b></header>
 <div class="pp-body"><button type="button" class="f photo" data-key="passport.photo" aria-label="Passport photo">${faceSVG(p.face)}</button>
-<div class="fields">${F('passport.name','Name',p.name)}${F('passport.dob','Born',BD.fmtDate(p.dob))}${F('passport.country','Country',p.country)}${F('passport.city','Issued in',p.city)}${F('passport.number','Passport no.',p.number)}${F('passport.expiry','Expires',BD.fmtDate(p.expiry))}${R('height')?F('passport.height','Height',p.height+' cm'):''}</div></div></article>`;
-    if(d.ticket)h+=`<article class="doc ticket"><header><span>VELDMARK</span><b>Entry ticket</b></header><div class="body">${F('ticket.name','Name',d.ticket.name)}${F('ticket.date','Valid on',BD.fmtDate(d.ticket.date))}${R('stay')?F('ticket.stay','Length of stay',d.ticket.stay+' days'):''}</div></article>`;
-    if(d.work)h+=`<article class="doc work"><header><span>MINISTRY OF LABOR</span><b>Work pass</b></header><div class="body work-grid"><div>${F('work.name','Name',d.work.name)}${F('work.number','Passport no.',d.work.number)}${F('work.until','Valid until',BD.fmtDate(d.work.until))}</div>
+<div class="fields">${F('passport.name','Name',p.name)}${F('passport.dob','Born',BD.fmtDate(p.dob))}${F('passport.country','Country',p.country)}${F('passport.city','Issued in',p.city)}${F('passport.number','Passport no.',p.number)}${F('passport.expiry','Expires',BD.fmtDate(p.expiry))}${R('height')?F('passport.height','Height',p.height+' cm'):''}${R('signature')?SIG('passport.sig',p.sig):''}</div></div></article>`;
+    if(d.ticket)h+=`<article class="doc ticket"><header><span>VELDMARK</span><b>Entry ticket</b></header><div class="body">${F('ticket.name','Name',d.ticket.name)}${F('ticket.date','Valid on',BD.fmtDate(d.ticket.date))}${R('stay')?F('ticket.stay','Length of stay',d.ticket.stay+' days'):''}${R('signature')?SIG('ticket.sig',d.ticket.sig):''}</div></article>`;
+    if(d.work)h+=`<article class="doc work"><header><span>MINISTRY OF LABOR</span><b>Work pass</b></header><div class="body work-grid"><div>${F('work.name','Name',d.work.name)}${F('work.number','Passport no.',d.work.number)}${F('work.until','Valid until',BD.fmtDate(d.work.until))}${R('sponsor')?F('work.employer','Employer',d.work.employer):''}</div>
 <div class="work-side"><button type="button" class="f seal-btn${BD.SEALS.includes(d.work.seal)?'':' fake'}" data-key="work.seal" aria-label="Seal">${sealSVG(d.work.seal)}</button>${R('fingerprint')?`<button type="button" class="f print-btn" data-key="work.print" aria-label="Fingerprint on pass">${printSVG(d.work.print)}</button>`:''}</div></div></article>`;
     if(d.vaccine)h+=`<article class="doc vaccine"><header><span>HEALTH OFFICE</span><b>Grayfever vaccine</b></header><div class="body">${F('vaccine.name','Name',d.vaccine.name)}${F('vaccine.number','Passport no.',d.vaccine.number)}${F('vaccine.date','Dose given',BD.fmtDate(d.vaccine.date))}</div></article>`;
-    if(d.id)h+=`<article class="doc idcard"><header><span>VELDMARK</span><b>Citizen ID</b></header><div class="body">${F('id.name','Name',d.id.name)}${F('id.dob','Born',BD.fmtDate(d.id.dob))}${F('id.district','District',d.id.district)}</div></article>`;
+    if(d.id)h+=`<article class="doc idcard"><header><span>VELDMARK</span><b>Citizen ID</b></header><div class="body">${F('id.name','Name',d.id.name)}${F('id.dob','Born',BD.fmtDate(d.id.dob))}${F('id.district','District',d.id.district)}${R('idexpiry')?F('id.expiry','Expires',BD.fmtDate(d.id.expiry)):''}</div></article>`;
     if(d.transit)h+=`<article class="doc transit"><header><span>VELDMARK RAIL</span><b>Transit slip</b></header><div class="body">${F('transit.name','Name',d.transit.name)}${F('transit.until','Must leave by',BD.fmtDate(d.transit.until))}</div></article>`;
     if(d.letter)h+=`<article class="doc letter${d.letter.country!==p.country?' fake':''}"><header><span>EMBASSY</span><b>Accreditation</b></header><div class="body">${F('letter.name','Diplomat',d.letter.name)}${F('letter.country','Embassy of',d.letter.country)}</div></article>`;
+    if(d.declaration)h+=`<article class="doc declaration"><header><span>CUSTOMS</span><b>Cash declaration</b></header><div class="body">${F('declaration.name','Name',d.declaration.name)}${F('declaration.amount','Amount',CR(d.declaration.amount))}</div></article>`;
     if(d.consent)h+=`<article class="doc consent"><header><span>FAMILY OFFICE</span><b>Guardian consent</b></header><div class="body">${F('consent.name','Traveler',d.consent.name)}${F('consent.guardian','Guardian',d.consent.guardian)}</div></article>`;
     const docs=this.q('.docs');docs.innerHTML=h;docs.scrollLeft=0;this.q('.desk').scrollTop=0;this.touched=[];
     this.layoutDocs();this.applyEvent();
@@ -1129,7 +1238,7 @@ class Desk{
     const docs=this.q('.docs');
     docs.addEventListener('pointerdown',e=>{
       const doc=e.target.closest('.doc');if(!doc)return;
-      if(this.c&&this.c.event==='power'&&!this.uv){doc.classList.add('lit');clearTimeout(doc._lit);doc._lit=setTimeout(()=>doc.classList.remove('lit'),4000);}
+      if(this.c&&(this.c.event==='power'||this.c.event==='blizzard')&&!this.uv){doc.classList.add('lit');clearTimeout(doc._lit);doc._lit=setTimeout(()=>doc.classList.remove('lit'),4000);}
       if(!docs.classList.contains('free'))return;
       doc.style.zIndex=++this.z;this.touched=[doc,...this.touched.filter(x=>x!==doc)].slice(0,2);
       const h=e.target.closest('header');if(!h)return;e.preventDefault();
@@ -1152,8 +1261,10 @@ class Desk{
     if(k==='purpose')a=`<p class="a">${esc(dodge?'Why do you ask?':t.say)}</p>`;
     else if(k==='stay')a=t.answers.stay!=null?`<button type="button" class="f a" data-key="answer.stay">“${t.answers.stay} days.”</button>`:`<p class="a">${t.docs.passport.diplomat?'As long as my posting lasts.':t.purpose==='return'?'I live here.':'Not long.'}</p>`;
     else if(k==='where')a=`<p class="a">${esc(dodge?'Here and there.':'A guesthouse in '+['Brask','Ollen','Vey'][t.height%3]+'.')}</p>`;
+    else if(k==='bag')a=`<button type="button" class="f a bag-scan" data-key="booth.bag"><span class="lbl">Bag scan</span>${esc(t.bag.join(', '))}${this.c.rules.has('declaration')?`<br><b>Cash: ${CR(t.cash)}</b>`:''}</button>`;
     else a=`<button type="button" class="f print-card" data-key="booth.print" aria-label="Traveler's fingerprint">${printSVG(t.print)}</button>`;
     tr.insertAdjacentHTML('beforeend',`<div class="q">You: ${esc(q)}</div>${a}`);
+    this.q('.ask-menu').hidden=true;const last=tr.lastElementChild;try{last.scrollIntoView({block:'nearest'});}catch(e){}
     if(this.inspect)tr.querySelectorAll('.f').forEach(x=>x.classList.toggle('sel',this.sel.includes(x.dataset.key)));
   }
   setUV(on){this.uv=on;this.q('.act-uv').classList.toggle('on',on);this.q('.desk').classList.toggle('uv',on);this.applyEvent();}
@@ -1166,7 +1277,7 @@ class Desk{
     if(this.layout==='solo')$('book').querySelectorAll('[data-key]').forEach(x=>x.classList.toggle('sel',s.includes(x.dataset.key)));}
   pick(key,el){
     if(!this.inspect||this.busy||!this.t)return;
-    const doc=el&&el.closest('.doc');if(doc&&this.c.event==='power'&&!this.uv&&!doc.classList.contains('lit'))return;
+    const doc=el&&el.closest('.doc');if(doc&&(this.c.event==='power'||this.c.event==='blizzard')&&!this.uv&&!doc.classList.contains('lit'))return;
     const i=this.sel.indexOf(key);if(i>=0)this.sel.splice(i,1);else this.sel.push(key);this.hl();
     this.hooks.onPick&&this.hooks.onPick(key);
     if(this.sel.length<2)return;
@@ -1326,7 +1437,7 @@ function startEndless(){
 function storyDay(){
   const st=SV.story,day=st.day;
   const c=BD.makeDay(day,(st.seed+day*101)>>>0,STORY.over[day]);
-  const sc=STORY.scripted[day]||[];const n=10+Math.floor(day/2)+sc.length;const q=new Array(n).fill(null);sc.forEach(s=>q[Math.min(s.at,n-1)]=s);
+  const sc=STORY.scripted[day]||[];const n=10+Math.floor(day/2)+sc.length;const q=new Array(n).fill(null);sc.forEach(s=>{let i=Math.min(s.at,n-1);while(q[i]&&i<n-1)i++;q[i]=s;});
   const begin=()=>{const D=new Desk({mode:'story',c,seed:(st.seed+day*7)>>>0,queue:q,onEnd:endStory});mountSolo(D,day);ruleTip(D,day,()=>D.start());};
   runScene(STORY.intro[day]||[],st.flags,()=>{if(!needTutorial(begin))begin();},`Day ${day}`);
 }
@@ -1364,9 +1475,12 @@ function endEndless(D){
 }
 function endStory(D){
   const st=SV.story;st.pay+=D.score;st.cites+=D.cites;const day=st.day;const got=earn(D.score);
-  if(day>=10){
-    const [title,text]=storyEnding(st);SV.story=null;persist();
-    overlay(`<div class="speaker">Ending</div><h2>${esc(title)}</h2><p class="line">${esc(text)}</p><p>Total pay ${st.pay} cr · ${st.cites} citations over 10 days.</p><button class="btn primary" id="o3" type="button">Back to menu</button>`);
+  if(day===10||day>=20){
+    const ch2=day>=20,[title,text]=ch2?storyEnding2(st):storyEnding(st);SV.story=null;
+    if(ch2)SV.storyCh2={ending:title};else SV.storyCh1={flags:st.flags,pay:st.pay,cites:st.cites,ending:title};persist();
+    overlay(`<div class="speaker">${ch2?'Chapter 2 ending':'Chapter 1 ending'}</div><h2>${esc(title)}</h2><p class="line">${esc(text)}</p><p>Pay ${st.pay} cr \u00b7 ${st.cites} citations this chapter.</p>
+<div class="row">${ch2?'':'<button class="btn primary" id="o5" type="button">Chapter 2: the Northern Pass</button>'}<button class="btn${ch2?' primary':''}" id="o3" type="button">Back to menu</button></div>`);
+    const c2=$('o5');if(c2)c2.onclick=()=>{closeOverlay();teardown();startChapter2();};
     $('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};return;}
   st.day=day+1;persist();
   overlay(`<h2>End of day ${day}</h2><p>Record so far: ${st.cites} citations. Today’s pay of ${got} crowns goes to your wallet.</p>${statsHTML(D,' cr')}
@@ -1391,7 +1505,7 @@ function countdown(go){
   let n=3;const tick=()=>{if(n===0){overlay('<div class="countdown">GO</div>');sound('go');setTimeout(()=>{closeOverlay();go();},500);return;}
     overlay(`<div class="countdown">${n}</div>`);sound('tick');n--;setTimeout(tick,750);};tick();
 }
-const RACE_DAYS=[[3,'Easy'],[6,'Medium'],[10,'Hard'],[14,'Expert']];
+const RACE_DAYS=[[3,'Easy'],[6,'Medium'],[10,'Hard'],[14,'Expert'],[20,'Master']];
 function raceResults(rows,again){
   rows.sort((a,b)=>a.time-b.time);
   overlay(`<h2>Race results</h2><div class="list">${rows.map((r,i)=>`<div class="item"><span class="place">${i+1}</span><div><b>${esc(r.name)}</b><small>${r.cites} mistake${r.cites===1?'':'s'} (+${r.cites*10}s) · ${r.bonus} bonus (−${r.bonus*2}s)</small></div><b>${fmtTime(r.time)}</b></div>`).join('')}</div>
@@ -1534,10 +1648,13 @@ function renderMenu(){
   show('menu');
   $('menu-wallet').textContent=`Wallet: ${SV.crowns} crowns`+(Object.keys(SV.upgrades).length?` · ${Object.keys(SV.upgrades).length} tools owned`:'');
   const sb=$('story-btns');
-  if(SV.story){sb.innerHTML=`<button class="btn primary" id="st-cont" type="button">Continue · Day ${SV.story.day}</button><button class="btn" id="st-new" type="button">Start over</button>`;$('story-meta').textContent=`Day ${SV.story.day} of 10`;}
-  else{sb.innerHTML=`<button class="btn primary" id="st-new" type="button">Start story</button>`;$('story-meta').textContent='10 days';}
+  const ch=SV.story&&SV.story.day>10?2:1;
+  if(SV.story){sb.innerHTML=`<button class="btn primary" id="st-cont" type="button">Continue \u00b7 Day ${SV.story.day}</button><button class="btn" id="st-new" type="button">Restart chapter ${ch}</button>`;$('story-meta').textContent=`Chapter ${ch} \u00b7 Day ${SV.story.day} of 20`;}
+  else if(SV.storyCh1){sb.innerHTML=`<button class="btn primary" id="st-ch2" type="button">${SV.storyCh2?'Replay chapter 2':'Chapter 2: the Northern Pass'}</button><button class="btn" id="st-new" type="button">Replay chapter 1</button>`;$('story-meta').textContent=SV.storyCh2?'Both chapters done':'Chapter 1 done';}
+  else{sb.innerHTML=`<button class="btn primary" id="st-new" type="button">Start story</button><button class="btn" id="st-ch2" type="button">${SV.storyCh2?'Replay chapter 2':'Skip to chapter 2'}</button>`;$('story-meta').textContent='2 chapters \u00b7 20 days';}
   const cont=$('st-cont');if(cont)cont.onclick=()=>storyDay();
-  $('st-new').onclick=()=>{SV.story={day:1,seed:rand32(),flags:{mercy:0,bribes:0,reported:null,anni:null,mara:false,fennCaught:false},pay:0,cites:0};persist();storyDay();};
+  const c2b=$('st-ch2');if(c2b)c2b.onclick=startChapter2;
+  $('st-new').onclick=()=>{if(ch===2&&SV.story){startChapter2();return;}SV.story={day:1,seed:rand32(),flags:{mercy:0,bribes:0,reported:null,anni:null,mara:false,fennCaught:false},pay:0,cites:0};persist();storyDay();};
   const max=Math.min(SV.arcadeMax+1,30);let h='';
   for(let d=1;d<=max;d++){const b=SV.best[d];h+=`<button class="chip-day${b==null?' new':''}" type="button" data-day="${d}"><b>Day ${d}</b><small>${b==null?'new':'best '+b}</small></button>`;}
   $('arcade-days').innerHTML=h;

@@ -12,12 +12,12 @@ vm.runInNewContext(src, { globalThis: ctx });
 const BD = ctx.BD;
 
 let checks = 0;
-const CRIMES = new Set(['photo', 'city', 'seal', 'fingerprint', 'diplomat']);
+const CRIMES = new Set(['photo', 'city', 'seal', 'fingerprint', 'diplomat', 'contraband', 'wanted', 'signature']);
 let diplomats = 0, minors = 0, transits = 0;
 const fail = (msg, t) => { console.error('FAIL:', msg, JSON.stringify(t, null, 1)); process.exit(1); };
 const N = 1000;
 
-for (const day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 99]) {
+for (const day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 25, 99]) {
   for (let seed = 1; seed <= 5; seed++) {
     const c = BD.makeDay(day, seed * 7777, day === 99 ? { today: 15 } : undefined);
     const r = BD.rng(seed * 31 + day);
@@ -51,8 +51,8 @@ for (const day of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 99]) {
   }
 }
 // Rules unlock one per day as designed.
-const unlock = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map(d => BD.makeDay(d, 1).rules.size);
-if (unlock.join() !== '2,3,5,6,7,8,9,10,11,12,13,14,15,16,16') fail('rule unlock schedule ' + unlock.join(), {});
+const unlock = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map(d => BD.makeDay(d, 1).rules.size);
+if (unlock.join() !== '2,3,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,22') fail('rule unlock schedule ' + unlock.join(), {});
 if (!diplomats || !minors || !transits) fail(`new traveler kinds not generated: ${diplomats}/${minors}/${transits}`, {});
 // Diplomats from the closed country, without ticket or vaccine slip, are still valid.
 { const c = BD.makeDay(14, 3); const r = BD.rng(9); let n = 0;
@@ -66,4 +66,9 @@ if (!diplomats || !minors || !transits) fail(`new traveler kinds not generated: 
 // Events: none before day 3; seeded.
 for (let s = 0; s < 200; s++) { if (BD.makeDay(2, s).event) fail('event before day 3', {}); }
 if (BD.makeDay(9, 77).event !== BD.makeDay(9, 77).event) fail('event not seeded', {});
+// Contraband and wanted lists exist from their days and depend on the seed.
+{ const a = BD.makeDay(17, 5);
+  if (a.contraband.length !== 3 || BD.makeDay(16, 5).contraband.length) fail('contraband list', a.contraband);
+  if (new Set([5, 6, 7, 8].map(s => JSON.stringify(BD.makeDay(17, s).contraband))).size < 2) fail('contraband list never changes', {});
+  if (BD.makeDay(19, 5).wanted.length !== 2 || BD.makeDay(18, 5).wanted.length) fail('wanted list', {}); }
 console.log(`engine OK (${checks} checks)`);

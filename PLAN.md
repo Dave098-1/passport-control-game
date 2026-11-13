@@ -1,3 +1,116 @@
+# Story Chapter 2: days 11–20, a new rule every day
+
+## Context
+The user wants more story days, with a new rule each day. Today:
+- **Story:** ends after day 10 (`endStory` in `index.html`: `if(day>=10)` shows the ending and clears `SV.story`).
+- **Rules:** 16 rules unlock on days 1–14 (`RULES` in the engine). The story only reaches the day-10 rule.
+- **Arcade:** days after 14 just repeat all rules.
+
+Goal: a **Chapter 2** covering days 11–20, where every day introduces exactly one rule:
+- days 11–14 use the existing rules (fingerprint, transit, diplomats, minors);
+- days 15–20 get **6 new rules**.
+
+Players who already finished Chapter 1 can start Chapter 2 without replaying it. Arcade gains days 15–20 too.
+
+## 1. Six new rules (engine, same `CHECK` + `PLANT` + two-field pattern)
+| Day | Rule | New data | Inspect pair | Crime? |
+|---|---|---|---|---|
+| 15 | **ID expiry**: citizens' ID cards must not be expired | `id.expiry` | `id.expiry` + `desk.date` | no |
+| 16 | **Sponsor**: work passes must name a registered employer (list of 4 in the rulebook: Brask Mill, Harbor Authority, Vey Ironworks, Ollen Rail) | `work.employer`; bad names like "Kessler Imports" | `work.employer` + `rule.sponsor` | no |
+| 17 | **Contraband**: ask "Open your bag, please". The bag scan lists items; anything on today's banned-goods list (rotates daily: seeds, medicine, weapons parts, birds, Zemoran cigarettes…) is smuggling | `t.bag` items, `c.contraband` | `booth.bag` + `rule.contraband` | **yes** |
+| 18 | **Cash declaration**: anyone carrying over 5,000 cr (shown in the bag scan) needs a customs declaration with the same amount | `t.cash`, doc `declaration {name, amount}` | missing: `booth.bag` + `rule.declaration`; mismatch: `declaration.amount` + `booth.bag` | no |
+| 19 | **Wanted list**: the bulletin shows 2 wanted people (name and face). A match must be detained | `c.wanted` (generated people) | `passport.name` + `rule.wanted` | **yes** |
+| 20 | **Signatures**: the entry ticket's signature must match the passport signature (squiggles drawn from a seed) | `pp.sig`, `ticket.sig` | `ticket.sig` + `passport.sig` | **yes** (forgery) |
+
+Changes that go with it:
+- **Ask menu:** adds "Open your bag, please" from day 17.
+- **New paper:** a customs declaration form.
+- **Rulebook:** gets the employer list, the daily contraband list, and wanted posters with faces.
+- **Checklist card:** learns the new rules.
+- **Arcade:** day chips go up to day 20, and the race difficulty "Expert" becomes the day-20 rules.
+
+## 2. Chapter 2 story (days 11–20)
+- **Setting:** after the Chapter 1 ending, you're transferred to the **Northern Pass**, a mountain checkpoint by the Zemora border:
+  - **Chief Sarna Holt** (new boss) briefs each morning on the day's new rule.
+  - **Tomas** works the booth next to you.
+  - **Returning characters**, depending on Chapter 1 choices:
+    - **Mara Tellen** is investigating a smuggling ring.
+    - **Fenn Kovac** turns up with contraband if he wasn't caught; if he was, his partner turns up.
+    - **Anni and Pavel Desh**: Pavel's ID card is about to expire.
+    - **Ivo** appears in one scene if he was reported.
+- **Each day:** 15–20 travelers (`10 + floor(day/2)`), plus 1–2 scripted travelers with choices:
+  - help a family past an expired ID;
+  - a bribe to ignore a bag;
+  - a wanted person who claims to be framed;
+  - Mara asking you to let a contraband courier through so she can follow him.
+  - Fixed events: rush hour, inspector visit, power cut, and a blizzard (new event: the shift is shorter and travelers are desperate).
+- **Endings after day 20:** four, built from Chapter 1 and Chapter 2 flags:
+  - **Dismissed:** too many citations.
+  - **The Ring Breaks:** you helped Mara bring down the smuggling ring.
+  - **Mountain Fortune:** you took bribes.
+  - **Keeper of the Pass:** a by-the-book promotion.
+- **Saves:**
+  - Finishing Chapter 1 now keeps `SV.storyCh1 = {flags, pay, cites, ending}` instead of throwing it away.
+  - The menu's Story card shows **Chapter 2 · Northern Pass** once Chapter 1 is done, plus a "Replay chapter 1" button.
+  - Players who finished Chapter 1 before this update get a Chapter 2 start with neutral flags.
+
+## 3. Files
+- `index.html`: engine rules and data; renderers for the bag scan, declaration form, wanted posters and signatures; the bag question in Ask; story content for days 11–20 and the chapter flow in `storyDay` / `endStory` / `renderMenu`; arcade up to day 20.
+- `tests/engine.test.js`: days 15–20, crime flags for the new crime rules, contraband list changing by day.
+- `tests/e2e.js`:
+  - start Chapter 2 from a finished Chapter 1;
+  - the day-17 bag question, with smuggling detained;
+  - the day-19 wanted list.
+- `sw.js`: version bump. `README.md`: Chapter 2.
+
+## Verification
+- `node tests/engine.test.js`: valid travelers pass every rule up to day 20, every planted new rule is caught, only contraband, wanted and forged signatures are crimes, and the same seed gives the same day.
+- `node tests/e2e.js`, `tests/accounts.e2e.js` and `tests/race-online.e2e.js` all pass.
+- Screenshots: a bag scan on iPhone, wanted posters in the rulebook on desktop.
+- Push, open a PR, and the user plays Chapter 2 on their phone.
+
+# Question only: "could Claude make this a real mobile app?" (no changes requested)
+Answer given in chat; nothing to build. Steps if the user later asks:
+1. Wrap with Capacitor.
+2. Turn off the iOS gate in the app build.
+3. Native Google sign-in and Sign in with Apple.
+4. Account deletion via a Supabase Edge Function.
+5. Privacy policy page.
+6. Android build on Linux/CI, iOS build on a Mac or cloud CI.
+7. Store listings.
+
+# Now: switch on Google's pop-up with the Client ID
+The pop-up code is already pushed (commit "Use Google's own sign-in pop-up…"). The Client ID is now known: `862157398756-8cns40bes4piahbofscdm5dol0lmnd0c.apps.googleusercontent.com`.
+1. In `index.html`, set `const GOOGLE_CLIENT_ID=window.__TEST_GOOGLE_ID||'<that id>';`.
+2. Bump `VERSION` in `sw.js` so installed copies update.
+3. Run `node tests/accounts.e2e.js`. The test overrides the ID, so it stays valid.
+4. Commit and push, then open **PR #3** "Show Border Desk in Google sign-in". The user merges it.
+5. Before testing, the user checks:
+   - **Google Cloud → Clients → your client:** Authorized JavaScript origins includes `https://dave098-1.github.io`. The pop-up needs that origin.
+   - **Supabase → Authentication → Providers → Google:** the same Client ID is in "Client IDs". It already is, since it's the one they set up.
+
+# (Done) show "Border Desk" instead of the Supabase address in Google sign-in
+**Waiting on the user:** the Google OAuth **Client ID**, which is public. Also their Branding page: app name only, no logo, since a logo forces Google's review.
+
+Once I have the ID:
+- **Sign-in button:** in `index.html`, load Google Identity Services (`https://accounts.google.com/gsi/client`) only on the Pages version, when the login screen opens. Render Google's own button styled to match the black button: `type:"standard"`, `theme:"filled_black"`, `shape:"pill"`, `text:"signin_with"`.
+- **Token hand-off:** on the credential callback, call `Cloud.sb.auth.signInWithIdToken({provider:'google', token: credential, nonce})`. The nonce is generated per attempt; Google gets its SHA-256 hash and Supabase gets the raw value.
+- **Fallback:** if the Google script fails or is blocked (for example inside an iPhone Home Screen app), show the current redirect button instead.
+- **Tests:** extend `tests/accounts.e2e.js` with a stand-in `google.accounts.id` and a stand-in `signInWithIdToken`.
+- Push, open PR #3, and the user checks it on their phone.
+
+# Now: ship accounts (PR #1 is already merged)
+The user can't find a merge button because **PR #1 was already merged** (by Dave098-1 at 16:21 UTC). The game and v2 are on `main`, so the Pages site already serves them.
+The two later commits never reached `main`, because they landed after that merge:
+- `176e510` accounts;
+- `198cf26` login restyle.
+
+Steps:
+1. Rebase `claude/relaxed-euler-h7n9ce` onto `origin/main`. The merged history is already in `main`, so the 2 commits replay cleanly. Push with `--force-with-lease`, since the branch only drops already-merged history.
+2. Re-run the engine and account tests on the rebased branch.
+3. Open **PR #2** "Add optional accounts with cross-device saves", and tell the user to merge it.
+4. Tell the user Pages is already live with v2: https://dave098-1.github.io/passport-control-game/
+
 # Plan: Border Desk accounts (cross-device saves)
 
 ## Context
