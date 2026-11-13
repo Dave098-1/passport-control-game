@@ -21,6 +21,7 @@ A passport control game for desktop and mobile browsers. You are an officer at t
 - **Inspect**: tap two things that disagree for a bonus.
 - On a computer or iPad in landscape, drag documents by their header and press **Line up** to compare two side by side.
 - **Daily events** (from day 3): rush hour, inspector visit, a pushy VIP, or a power cut.
+- **Settings**: sound, and **Stamp it yourself**. With it on, tapping Approve, Deny or Detain picks up the stamp, and tapping the passport inks it right there. Keyboard keys stamp straight away.
 - **Booth shop**: spend the crowns you earn on Quick stamp, Checklist card, Thermos, UV lamp and Lucky charm.
 
 ## Accounts (optional)
@@ -52,6 +53,7 @@ On iOS the game only runs from the Home Screen. Opening it in Safari or another 
 | `tools/build-artifact.js` | Makes the Claude artifact version of `index.html` (published with the `room`, `db` and `user` capabilities) |
 | `tests/engine.test.js` | Rules engine test (`node tests/engine.test.js`) |
 | `tests/e2e.js` | Browser tests with Playwright (`node tests/e2e.js`) |
+| `tests/stamp.e2e.js` | Settings and manual stamping on desktop and phone (`node tests/stamp.e2e.js`) |
 | `tests/chapter2.e2e.js` | Chapter 2: start, bag check with a smuggler, wanted list, ending (`node tests/chapter2.e2e.js`) |
 | `tests/race-online.e2e.js` | Two-player online race over a stand-in for Supabase Realtime (`node tests/race-online.e2e.js`) |
 | `tests/accounts.e2e.js` | Account and sync tests against a stand-in Supabase (`node tests/accounts.e2e.js`) |
