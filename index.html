@@ -97,9 +97,11 @@ p{margin:0}
 
 /* ---------- game screen ---------- */
 #game{padding:8px var(--gutter-r) 8px var(--gutter-l)}
-#game.solo{display:grid}
-#game.split{display:grid;grid-template-columns:minmax(0,1fr) 250px minmax(0,1fr);gap:10px}
+#game.solo{display:grid;grid-template-rows:minmax(0,1fr)}
+#game.split{display:grid;grid-template-columns:minmax(0,1fr) 250px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}
 .desk-root{position:relative;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:10px;min-height:0;min-width:0}
+.desk-root>.hud{grid-row:1}.desk-root>.race-strip{grid-row:2}.desk-root>.main{grid-row:3}.desk-root>.actions{grid-row:4}
+.desk-root>.race-strip[hidden]+.main{margin-top:-10px}
 .hud{display:flex;align-items:center;gap:10px;min-height:44px;min-width:0}
 .icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;flex:none}
 .hud-day{font:800 20px/1 var(--display);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -250,12 +252,14 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 .bubble{position:fixed;max-width:min(340px,calc(100vw - 32px));background:var(--paper);color:var(--ink);border-radius:14px;padding:14px;display:grid;gap:10px;pointer-events:auto;box-shadow:0 12px 30px rgba(0,0,0,.45)}
 .bubble p{font-size:15px}
 .bubble .row .btn{color:var(--text)}
+.bubble .row .btn.primary{color:#1b1407}
 .bubble .wait{font:600 12px var(--mono);color:var(--ink-soft)}
 
 /* ---------- phones / narrow ---------- */
 @media (max-width:899px){
   .main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
-  .booth{flex-direction:row;padding:10px;align-items:stretch;max-height:190px}
+  .booth{flex-direction:row;padding:10px;align-items:stretch;max-height:min(190px,30vh)}
+  .talk{gap:6px}
   .face-btn{width:84px;align-self:start}
   .speech{font-size:13.5px}
   .docs{flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x mandatory;margin:-4px;padding:4px 4px 14px}

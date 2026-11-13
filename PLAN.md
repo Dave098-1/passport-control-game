@@ -116,6 +116,12 @@ All racers get the **same day**: same seed, rules, event and travelers. The race
 8. Race: same-device split screen and pass-and-play, then the online race over `room`. Republish the artifact with `capabilities: {room: {}}`.
 9. Bump `VERSION` in `sw.js`. Update README and PLAN.md, rebuild the artifact (`node tools/build-artifact.js`) and republish it to the same URL, then commit and push.
 
+## Status (after the worker restart)
+Steps 0–9 are built, all browser and engine tests pass, and the artifact is republished (version 2, with `room` declared).
+One thing is left: **commit and push** the last `index.html` fixes, which are local only:
+- the phone grid fix that kept the stamp buttons on screen;
+- a readable "Next" button in the tutorial.
+
 ## Verification
 - `node tests/engine.test.js` covers days 1–20: valid travelers pass, every planted rule (new ones included) is caught, diplomats are exempt, and `crime` is set only for the crime rules.
 - `node tests/e2e.js` adds:
