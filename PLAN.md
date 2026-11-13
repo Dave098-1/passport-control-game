@@ -73,6 +73,9 @@ Android and desktop are never blocked. On Android a dismissible "Install app" ba
 - `env(safe-area-inset-*)` padding for the notch and home bar in standalone mode, `100dvh`, no page scroll or zoom while playing, `touch-action: manipulation`.
 - Color tokens on `:root` with a dark theme, a 16px gutter at phone width, settings for reduced motion and sound.
 
+## GitHub Pages URL
+Pages is enabled on the repo. The site URL is **https://dave098-1.github.io/passport-control-game/** (also shown under repo Settings → Pages → "Your site is live at…"). Right now `main` only has `README.md`, so the site shows the README or a 404 until phase 7 adds `index.html` and the deploy workflow and the branch is merged into `main`. The game's iOS gate will use this URL as its "install from here" link.
+
 ## Implementation phases
 0. **Detection probe:** publish a tiny artifact that prints `userAgent`, `navigator.standalone`, `display-mode` and `window.top === window`. The user adds it to their Home Screen on an iPhone and reports what it shows. This decides the artifact-side gate behavior described above.
 1. **Shell + gate:** `index.html` with the platform detection, the install gate (all browser variants), the main menu, and the responsive desk layout with placeholders.
