@@ -1,5 +1,5 @@
 // Offline support for the GitHub Pages version. Bump VERSION when index.html changes.
-const VERSION = 'border-desk-v7';
+const VERSION = 'border-desk-v8';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

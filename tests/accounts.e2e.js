@@ -74,7 +74,7 @@ const STUB = `window.supabase={createClient(){
     await page.click('#btn-account');
     await page.waitForSelector('#acc-google');
     ok(await page.isVisible('#acc-google') && await page.isVisible('.or'), 'login: Google button and "or" divider shown');
-    await page.click('#acc-google'); await page.waitForTimeout(100);
+    await page.click('#acc-google-alt'); await page.waitForTimeout(100);
     ok(/isn.t switched on yet/.test(await page.textContent('#acc-err')), 'login: Google not enabled yet gives a clear message');
     await page.click('#acc-switch');
     await fill(page, '#acc-email', 'ana@example.com'); await fill(page, '#acc-pw', 'short'); await fill(page, '#acc-pw2', 'short');
@@ -153,6 +153,24 @@ const STUB = `window.supabase={createClient(){
     ok(args && args.provider === 'google' && args.token === 'header.payload.sig' && crypto.createHash('sha256').update(args.nonce).digest('hex') === hashed, 'google pop-up: token passed to Supabase with a matching nonce');
     ok(await page.isHidden('#overlay') && /g@example\.com/.test(await page.textContent('#btn-account')), 'google pop-up: signed in and login screen closed');
     ok(errs.length === 0, 'google pop-up: no errors ' + errs.join(' | '));
+    await ctx.close();
+  }
+  // If a tap reaches the designed button itself, it asks Google for its prompt and never redirects.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.exposeFunction('__sb', (op, a) => backend(op, a));
+    await ctx.route('**/supabase.min.js', r => r.fulfill({ contentType: 'text/javascript', body: STUB.replace("signInWithOAuth:async()=>(", "signInWithOAuth:async()=>(window.__redirected=true,") }));
+    await ctx.route('**/gsi/client', r => r.fulfill({ contentType: 'text/javascript', body: `window.google={accounts:{id:{initialize(o){window.__gsi=o;},renderButton(){},prompt(cb){window.__prompted=true;window.__gsi.callback({credential:'p.q.r'});}}}};` }));
+    await ctx.addInitScript(() => { window.__TEST_GOOGLE_ID = 'test-client.apps.googleusercontent.com'; localStorage.setItem('borderdesk.v1', JSON.stringify({ tutorialDone: true })); });
+    const page = await ctx.newPage();
+    await page.goto(url);
+    await page.click('#btn-account');
+    await page.waitForSelector('#acc-google');
+    await page.evaluate(() => { document.getElementById('acc-gsi').hidden = true; }); // the tap reaches the designed button
+    await page.click('#acc-google');
+    await page.waitForFunction(() => window.__BD.Cloud.user, null, { timeout: 5000 }).catch(() => {});
+    ok(await page.evaluate(() => window.__prompted && !window.__redirected), 'google: designed button opens Google\u2019s prompt, never the old redirect page');
+    ok(await page.evaluate(() => !!(window.__BD.Cloud.user && window.__BD.Cloud.user.email === 'g@example.com')), 'google: signed in through the prompt');
     await ctx.close();
   }
   // Claude artifact version: saves to the viewer's Claude account through a stand-in db.
