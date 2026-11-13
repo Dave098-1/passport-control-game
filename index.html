@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Border Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1a24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Border Desk">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: night-shift checkpoint. Booth | desk of paper documents | rulebook; on phones the booth is a strip and the rulebook a drawer.
+   Split-screen race: desk | rulebook | desk. */
+:root{
+  --bg:#0f1a24; --booth:#162533; --panel:#1d3042; --line:#2c4458; --text:#e7eef3; --muted:#93a8b8;
+  --lamp:#e9b44c; --approve:#3c9f6a; --deny:#d24b3c; --detain:#8b5cc7; --info:#5aa3d6;
+  --paper:#f3eedf; --ink:#2a2620; --ink-soft:#6b6355;
+  --display:"Big Shoulders Display",Impact,"Arial Narrow",sans-serif;
+  --sans:"IBM Plex Sans",-apple-system,system-ui,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --gutter-l:max(16px,env(safe-area-inset-left,0px)); --gutter-r:max(16px,env(safe-area-inset-right,0px));
+  color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{height:100%;background:var(--bg)}
+body{height:100%;margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--sans);overflow:hidden;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;cursor:pointer}
+input{font:inherit;color:var(--text);background:var(--booth);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;user-select:text;-webkit-user-select:text}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+a{color:var(--lamp)}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+/* .f = any field the player can tap in Inspect mode; component rules below refine it */
+.f{display:grid;gap:0;text-align:left;border:1px dashed transparent;background:none;border-radius:6px;padding:2px 4px;color:inherit;cursor:default}
+.f .lbl{font:600 9.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+.f .val{font:600 14px var(--mono);color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.screen{position:fixed;inset:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 16px;font-weight:600}
+.btn.primary{background:var(--lamp);border-color:var(--lamp);color:#1b1407}
+.btn.small{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ---------- iOS install gate ---------- */
+#gate{z-index:100;background:var(--bg);overflow-y:auto;padding-left:var(--gutter-l);padding-right:var(--gutter-r)}
+.gate-card{max-width:520px;margin:0 auto;padding-block:40px 120px;display:grid;gap:20px}
+.gate-card h1{font:800 40px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
+.gate-card .lead{color:var(--muted);font-size:16px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:12px;counter-reset:s}
+.steps li{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;counter-increment:s}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--lamp);color:#1b1407;font:800 18px var(--display)}
+.steps b{color:#fff}
+.ios-ico{display:inline-block;vertical-align:-5px;width:22px;height:22px;margin:0 2px;color:var(--info)}
+.gate-note{color:var(--muted);font-size:13px}
+.copyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.copyrow code{font:13px var(--mono);overflow-wrap:anywhere;flex:1 1 200px;user-select:text;-webkit-user-select:text}
+.arrow{position:fixed;z-index:101;width:44px;height:44px;color:var(--lamp);pointer-events:none}
+.arrow.down{bottom:calc(env(safe-area-inset-bottom,0px) + 8px);left:calc(50% - 22px);animation:bob 1.2s ease-in-out infinite}
+.arrow.up{top:calc(env(safe-area-inset-top,0px) + 8px);right:calc(env(safe-area-inset-right,0px) + 24px);transform:rotate(180deg);animation:bobup 1.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(8px)}}
+@keyframes bobup{0%,100%{transform:rotate(180deg)}50%{transform:rotate(180deg) translateY(8px)}}
+
+/* ---------- menu ---------- */
+#menu{overflow-y:auto;padding-left:var(--gutter-l);padding-right:var(--gutter-r);
+  background:radial-gradient(ellipse 80% 50% at 50% 0%,#24394d 0%,var(--bg) 70%)}
+.menu-in{max-width:620px;margin:0 auto;padding-block:40px;display:grid;gap:24px}
+.brand{display:grid;gap:6px}
+.eyebrow{font:600 12px var(--mono);letter-spacing:.18em;color:var(--lamp);text-transform:uppercase}
+.brand h1{font:800 clamp(56px,16vw,96px)/.85 var(--display);text-transform:uppercase;letter-spacing:.01em}
+.brand p{color:var(--muted);max-width:44ch}
+.wallet{font:600 13px var(--mono);color:var(--lamp)}
+.modes{display:grid;gap:12px}
+.mode{display:grid;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.mode-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.mode h2{font:800 28px/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+.mode .meta{font:12px var(--mono);color:var(--muted)}
+.mode p{color:var(--muted);font-size:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip-day{min-width:56px;border:1px solid var(--line);background:var(--booth);border-radius:10px;padding:8px 10px;display:grid;gap:2px;text-align:left}
+.chip-day b{font:800 18px/1 var(--display)}
+.chip-day small{font:11px var(--mono);color:var(--muted)}
+.chip-day.new{border-color:var(--lamp)}
+.chip-day.on{background:var(--lamp);border-color:var(--lamp);color:#1b1407}
+.chip-day.on small{color:#3b2c0b}
+.menu-foot{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- game screen ---------- */
+#game{padding:8px var(--gutter-r) 8px var(--gutter-l)}
+#game.solo{display:grid;grid-template-rows:minmax(0,1fr)}
+#game.split{display:grid;grid-template-columns:minmax(0,1fr) 250px minmax(0,1fr);grid-template-rows:minmax(0,1fr);gap:10px}
+.desk-root{position:relative;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:10px;min-height:0;min-width:0}
+.desk-root>.hud{grid-row:1}.desk-root>.race-strip{grid-row:2}.desk-root>.main{grid-row:3}.desk-root>.actions{grid-row:4}
+.desk-root>.race-strip[hidden]+.main{margin-top:-10px}
+.hud{display:flex;align-items:center;gap:10px;min-height:44px;min-width:0}
+.icon-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;flex:none}
+.hud-day{font:800 20px/1 var(--display);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-date{padding:4px 6px;font:600 13px var(--mono);color:var(--lamp);white-space:nowrap}
+.hud-event{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;background:var(--lamp);color:#1b1407;border-radius:999px;padding:3px 8px;white-space:nowrap}
+.hud-mid{margin-left:auto;font:600 14px var(--mono);color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hud-mid.warn{color:var(--deny)}
+.hud-score{font:800 24px/1 var(--display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hud-score small{font:600 12px var(--mono);color:var(--lamp);margin-left:4px}
+.race-strip{display:grid;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.racer{display:grid;grid-template-columns:minmax(60px,140px) 1fr auto;gap:8px;align-items:center;font:600 12px var(--mono)}
+.racer .bar{height:8px;border-radius:4px;background:var(--booth);overflow:hidden}
+.racer .bar i{display:block;height:100%;background:var(--info)}
+.racer.me .bar i{background:var(--lamp)}
+.racer.done .bar i{background:var(--approve)}
+.racer span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main{display:grid;grid-template-columns:230px minmax(0,1fr) 300px;gap:10px;min-height:0}
+.split .main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.booth{background:linear-gradient(180deg,#203548,var(--booth));border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+.split .booth{flex-direction:row;padding:10px}
+.face-btn{border:2px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#4a6175,#2e4253);padding:0;width:100%;aspect-ratio:5/6;overflow:hidden;display:block;flex:none}
+.split .face-btn{width:84px;align-self:start}
+.face-btn svg{width:100%;height:100%;display:block}
+.face-btn.arrive{animation:arrive .3s ease-out}
+@keyframes arrive{from{transform:translateX(-30%);opacity:0}}
+.talk{display:grid;gap:8px;min-width:0;align-content:start;flex:1}
+.who{font:600 12px var(--mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.speech{background:var(--paper);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:14px;min-height:2.6em}
+.chips-row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 10px;font:600 12px var(--mono)}
+.chip.height{background:repeating-linear-gradient(90deg,var(--panel) 0 6px,#26405a 6px 7px)}
+.ask-menu{display:grid;gap:6px}
+.ask-menu .btn{text-align:left}
+.transcript{display:grid;gap:6px}
+.transcript .q{font:600 11px var(--mono);color:var(--muted)}
+.transcript .a{background:var(--paper);color:var(--ink);border-radius:10px;padding:6px 10px;font-size:13.5px;justify-self:start}
+.transcript .f.a{border:1px dashed transparent}
+.print-card{width:72px;background:var(--paper);border-radius:8px;padding:4px}
+.print-card svg,.print-btn svg{display:block;width:100%}
+.checklist{font:12px var(--mono);color:var(--muted);background:var(--booth);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.checklist b{color:var(--lamp);font-weight:600}
+.desk{position:relative;min-height:0;overflow:auto;border-radius:14px;padding:12px;
+  background:repeating-linear-gradient(90deg,#3b2d22 0 2px,#43342a 2px 7px),#40312a;border:1px solid #5a4636;-webkit-overflow-scrolling:touch}
+.desk-tools{position:absolute;right:10px;bottom:10px;z-index:500;display:flex;gap:6px}
+.docs{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.docs.free{display:block;position:relative;min-height:100%}
+.docs.free .doc{position:absolute}
+.docs.free .doc header{cursor:grab;touch-action:none}
+.docs.free .doc header:active{cursor:grabbing}
+.book{background:var(--panel);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.book-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.book-head h2{font:800 22px/1 var(--display);text-transform:uppercase;letter-spacing:.03em}
+.book-close{display:none}
+.book-body{overflow-y:auto;padding:12px 14px;display:grid;gap:10px;align-content:start}
+.book-body h3{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.rule.f{width:100%;border:1px solid var(--line);background:var(--booth);border-radius:10px;padding:10px;display:grid;gap:6px;font-size:13.5px}
+.rule.new{border-color:var(--lamp)}
+.rule .tag{font:600 10px var(--mono);color:var(--lamp);letter-spacing:.1em}
+.rule table{border-collapse:collapse;font:12px var(--mono);color:var(--muted);width:100%}
+.rule td{padding:2px 0;vertical-align:top}
+.rule td:first-child{color:var(--text);padding-right:8px;white-space:nowrap}
+.seals{display:flex;gap:10px;color:#c94a3a}
+.seals svg{width:36px;height:36px;background:var(--paper);border-radius:50%}
+.small-note{font:12px var(--mono);color:var(--muted)}
+.actions{display:flex;gap:8px;align-items:stretch}
+.actions .tools,.actions .stamps{display:flex;gap:8px}
+.actions .stamps{flex:1}
+.actions .stamps .act{flex:1}
+.act{min-height:56px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font:800 20px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;padding:0 14px}
+.act.deny{background:var(--deny);border-color:var(--deny);color:#fff}
+.act.approve{background:var(--approve);border-color:var(--approve);color:#fff}
+.act.detain{background:var(--detain);border-color:var(--detain);color:#fff}
+.act.on{background:var(--info);border-color:var(--info);color:#06131d}
+.act-book{display:none}
+kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid currentColor;border-radius:4px;padding:0 3px;vertical-align:2px}
+.finish-panel{position:absolute;inset:0;z-index:600;background:rgba(6,12,18,.82);display:grid;place-items:center;border-radius:14px;text-align:center;padding:20px}
+.finish-panel b{font:800 44px/1 var(--display);display:block;color:var(--lamp)}
+
+/* documents */
+.doc{width:290px;max-width:100%;background:var(--paper);color:var(--ink);border-radius:8px;box-shadow:0 6px 0 rgba(0,0,0,.25),0 12px 24px rgba(0,0,0,.25);overflow:hidden;flex:none;transition:filter .2s,opacity .2s}
+.doc header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;font:600 11px var(--mono);letter-spacing:.12em;background:var(--cover,#5f5546);color:#f6f0e0}
+.doc header b{font:800 16px/1 var(--display);letter-spacing:.08em;text-align:right}
+.doc .body{padding:10px 12px;display:grid;gap:4px}
+.pp-body{display:grid;grid-template-columns:86px 1fr;gap:10px;padding:10px 12px;position:relative}
+.photo{border:1px solid #b9ae94!important;border-radius:4px;padding:0;background:#c9d3d8;aspect-ratio:5/6;align-self:start;overflow:hidden}
+.photo svg{display:block;width:100%;height:100%}
+.doc.ticket{background:#e9f0e4}.doc.ticket header{background:#3e6b4f}
+.doc.work{background:#eef0f6}.doc.work header{background:#3c4f7c}
+.doc.vaccine{background:#f6ece8}.doc.vaccine header{background:#8a3d33}
+.doc.idcard{background:#efeadc}.doc.idcard header{background:#2f5d50}
+.doc.transit{background:#f1ede4}.doc.transit header{background:#5d5a52}
+.doc.letter{background:#fbf8ef}.doc.letter header{background:#a8842c}
+.doc.consent{background:#eef2ef}.doc.consent header{background:#4c6e6a}
+.work-grid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.work-side{display:grid;gap:6px;justify-items:center}
+.seal-btn{color:#b4392b;width:58px;height:58px;padding:2px;border-radius:50%}
+.seal-btn svg{width:100%;height:100%}
+.print-btn{width:56px;padding:2px}
+/* power cut + UV lamp */
+.desk.dark .doc:not(.lit){filter:brightness(.12)}
+.desk.uv{box-shadow:inset 0 0 0 999px rgba(110,40,200,.18)}
+.desk.uv .doc{filter:none!important}
+.desk.uv .seal-btn.fake,.desk.uv .doc.letter.fake{box-shadow:0 0 0 3px #ff3df5,0 0 18px #ff3df5}
+.desk.uv .doc.passport.genuine .pp-body::after{content:"VBA \2713";position:absolute;right:10px;bottom:6px;font:800 22px var(--display);color:rgba(110,40,200,.55);transform:rotate(-8deg)}
+
+/* inspect mode */
+.inspecting .f{cursor:pointer;border-color:rgba(90,163,214,.55)}
+.f.sel{border-color:var(--info)!important;border-style:solid!important;box-shadow:0 0 0 3px rgba(90,163,214,.45)}
+.inspect-bar{position:sticky;top:-12px;z-index:550;margin:-12px -12px 12px;padding:8px 12px;background:var(--info);color:#06131d;font:600 13px var(--sans)}
+
+/* stamp + toast (per desk) */
+.stamp{position:absolute;left:50%;top:42%;z-index:700;transform:translate(-50%,-50%) rotate(-12deg);font:800 clamp(30px,6vw,60px)/1 var(--display);letter-spacing:.06em;
+  padding:10px 22px;border:6px solid currentColor;border-radius:10px;text-transform:uppercase;background:rgba(243,238,223,.92);pointer-events:none;animation:stampin .25s cubic-bezier(.2,1.6,.4,1);white-space:nowrap}
+.stamp.ok{color:var(--approve)}.stamp.no{color:var(--deny)}.stamp.det{color:var(--detain)}
+@keyframes stampin{from{transform:translate(-50%,-50%) rotate(-12deg) scale(1.8);opacity:0}}
+.toast{position:absolute;left:50%;top:56px;transform:translateX(-50%);z-index:710;max-width:min(92%,460px);width:max-content;
+  padding:10px 16px;border-radius:12px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);text-align:center;pointer-events:none}
+.toast.good{background:var(--approve);color:#fff}.toast.bad{background:var(--deny);color:#fff}.toast.info{background:var(--info);color:#06131d}
+
+/* overlays */
+.overlay{position:fixed;inset:0;z-index:900;background:rgba(6,12,18,.78);display:grid;place-items:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) var(--gutter-r) max(16px,env(safe-area-inset-bottom,0px)) var(--gutter-l);overflow-y:auto}
+.card{width:100%;max-width:540px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;gap:14px}
+.card h2{font:800 32px/1 var(--display);text-transform:uppercase;letter-spacing:.02em}
+.card p{color:var(--muted)}
+.card .speaker{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--lamp)}
+.card .line{font-size:18px;color:var(--text)}
+.card label{display:grid;gap:4px;font:600 12px var(--mono);color:var(--muted)}
+.countdown{font:800 120px/1 var(--display);text-align:center;color:var(--lamp)}
+.code{font:800 56px/1 var(--display);letter-spacing:.12em;color:var(--lamp)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stat{background:var(--booth);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:2px}
+.stat b{font:800 28px/1 var(--display);font-variant-numeric:tabular-nums}
+.stat small{font:11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.list{display:grid;gap:6px}
+.list .item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--booth);border:1px solid var(--line);border-radius:10px;padding:10px}
+.list .item .place{font:800 24px/1 var(--display);color:var(--lamp);min-width:28px}
+.list .item small{display:block;font:12px var(--mono);color:var(--muted)}
+.list .item b{font-weight:600}
+.shop-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:var(--booth);border:1px solid var(--line);border-radius:10px;padding:12px}
+.shop-item small{display:block;color:var(--muted);font-size:13px}
+.howto ol{margin:0;padding-left:20px;display:grid;gap:8px;color:var(--text)}
+.choices{display:grid;gap:8px}
+
+/* coach marks */
+#coach{position:fixed;inset:0;z-index:1000;pointer-events:none}
+.spot{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(4,9,14,.62);border:2px solid var(--lamp);transition:all .25s ease;pointer-events:none}
+.bubble{position:fixed;max-width:min(340px,calc(100vw - 32px));background:var(--paper);color:var(--ink);border-radius:14px;padding:14px;display:grid;gap:10px;pointer-events:auto;box-shadow:0 12px 30px rgba(0,0,0,.45)}
+.bubble p{font-size:15px}
+.bubble .row .btn{color:var(--text)}
+.bubble .row .btn.primary{color:#1b1407}
+.bubble .wait{font:600 12px var(--mono);color:var(--ink-soft)}
+
+/* ---------- phones / narrow ---------- */
+@media (max-width:899px){
+  .main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .booth{flex-direction:row;padding:10px;align-items:stretch;max-height:min(190px,30vh)}
+  .talk{gap:6px}
+  .face-btn{width:84px;align-self:start}
+  .speech{font-size:13.5px}
+  .docs{flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x mandatory;margin:-4px;padding:4px 4px 14px}
+  .doc{width:min(320px,82vw);scroll-snap-align:center}
+  .book{position:fixed;left:0;right:0;bottom:0;z-index:800;max-height:78%;border-radius:16px 16px 0 0;
+    padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);
+    transform:translateY(105%);transition:transform .25s ease;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+  .book.open{transform:none}
+  .book-close{display:block}
+  .act-book{display:block}
+  .actions{flex-direction:column;gap:6px}
+  .actions .tools .act{min-height:38px;font-size:15px;flex:1}
+  .act{font-size:18px;padding:0 8px}
+  .hud-day{font-size:17px}
+  kbd{display:none}
+}
+@media (max-width:420px){.hud{gap:6px}.hud-event{display:none}.hud-date{font-size:12px}.hud-score{font-size:20px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<!-- ============ iOS install gate ============ -->
+<section id="gate" class="screen" hidden>
+  <div class="gate-card">
+    <span class="eyebrow">Border Desk</span>
+    <h1>Add to Home Screen to play</h1>
+    <p class="lead">On iPhone and iPad, Border Desk runs as an app from your Home Screen. It takes about 20 seconds.</p>
+    <ol class="steps" id="gate-steps"></ol>
+    <div class="copyrow" id="gate-copy" hidden><code id="gate-url"></code><button class="btn" id="gate-copy-btn" type="button">Copy link</button></div>
+    <p class="gate-note" id="gate-note"></p>
+  </div>
+  <svg class="arrow" id="gate-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v15m0 0-6-6m6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</section>
+
+<!-- ============ menu ============ -->
+<section id="menu" class="screen" hidden>
+  <div class="menu-in">
+    <div class="brand">
+      <span class="eyebrow">Veldmark · Eastern Checkpoint</span>
+      <h1>Border<br>Desk</h1>
+      <p>Check the papers. Compare them with today's rules. Approve, deny, or detain the crooks.</p>
+      <span class="wallet" id="menu-wallet"></span>
+    </div>
+    <div class="modes">
+      <div class="mode">
+        <div class="mode-head"><h2>Story</h2><span class="meta" id="story-meta">10 days</span></div>
+        <p>Your first ten days at the checkpoint. Regulars, a reporter, a smuggler with a fat wallet, and choices that decide how it ends.</p>
+        <div class="row" id="story-btns"></div>
+      </div>
+      <div class="mode">
+        <div class="mode-head"><h2>Race</h2><span class="meta">2–8 players</span></div>
+        <p>Everyone gets the same day and the same travelers. Fastest time wins, and every mistake adds 10 seconds.</p>
+        <div class="row"><button class="btn primary" id="btn-race-online" type="button">Online</button><button class="btn" id="btn-race-local" type="button">Same device</button></div>
+      </div>
+      <div class="mode">
+        <div class="mode-head"><h2>Arcade</h2><span class="meta">3-minute shifts</span></div>
+        <p>Every day adds a rule, up to day 14. Build a streak for a score multiplier. Finish a shift to unlock the next day.</p>
+        <div class="chips" id="arcade-days"></div>
+      </div>
+      <div class="mode">
+        <div class="mode-head"><h2>Endless</h2><span class="meta" id="endless-meta">Best: 0</span></div>
+        <p>Every rule at once, and it only gets harder. Three mistakes and you're done.</p>
+        <div class="row"><button class="btn primary" id="btn-endless" type="button">Start endless</button></div>
+      </div>
+    </div>
+    <div class="menu-foot">
+      <button class="btn" id="btn-shop" type="button">Booth shop</button>
+      <button class="btn" id="btn-tutorial" type="button">Tutorial</button>
+      <button class="btn" id="btn-howto" type="button">How to play</button>
+      <button class="btn" id="btn-sound" type="button">Sound: on</button>
+      <button class="btn" id="btn-install" type="button" hidden>Install app</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ game (desks are built by the Desk class) ============ -->
+<section id="game" class="screen" hidden></section>
+
+<aside class="book" id="book" aria-label="Rulebook" hidden>
+  <div class="book-head"><h2>Rulebook</h2><button class="btn book-close" id="book-close" type="button">Close</button></div>
+  <div class="book-body" id="book-body"></div>
+</aside>
+<div class="overlay" id="overlay" hidden><div class="card" id="overlay-card"></div></div>
+<div id="coach" hidden><div class="spot" id="coach-spot"></div><div class="bubble" id="coach-bubble"></div></div>
+
+<!-- ============ engine (no DOM; tested by tests/engine.test.js) ============ -->
+<script id="engine">
+(function(G){
+'use strict';
+const MS=86400000, EPOCH=Date.UTC(2031,3,2), YEAR=365;
+const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtDate(d){const x=new Date(EPOCH+(d-1)*MS);return String(x.getUTCDate()).padStart(2,'0')+' '+MONTHS[x.getUTCMonth()]+' '+x.getUTCFullYear();}
+function rng(seed){let a=seed>>>0;const f=()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+  return{f,int:(lo,hi)=>lo+Math.floor(f()*(hi-lo+1)),pick:a=>a[Math.floor(f()*a.length)],chance:p=>f()<p,
+    shuffle:a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(f()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}};}
+
+const HOME='Veldmark';
+const COUNTRIES={Veldmark:['Brask','Ollen','Vey'],Corvel:['Tamsk','Ury'],Ostrand:['Halde','Brinn'],Pelagia:['Mirel','Caspa'],Tirrin:['Dunmor','Keth'],Lumeno:['Avra','Solenne'],Zemora:['Koba','Rist']};
+const CODES={Veldmark:'VK',Corvel:'CV',Ostrand:'OS',Pelagia:'PG',Tirrin:'TR',Lumeno:'LM',Zemora:'ZM'};
+const FOREIGN=Object.keys(COUNTRIES).filter(c=>c!==HOME);
+const FIRST=['Anja','Bors','Celia','Dmitar','Edda','Feliks','Greta','Hanno','Ilse','Jonas','Katya','Lev','Mira','Nils','Olga','Pavo','Rada','Sven','Tamsin','Ugo','Vera','Wim','Yara','Zoltan','Ada','Emil','Lina','Oskar','Rhea','Teo'];
+const LAST=['Albrecht','Borisov','Corran','Dahl','Ekberg','Falk','Grosz','Halloran','Ivanic','Jansen','Kral','Lindqvist','Moravec','Novak','Orsini','Petrak','Quist','Rusk','Sorel','Tamas','Ulven','Varga','Weiss','Yelin','Zoric','Brandt','Kessler','Marek','Sato','Voss'];
+const DISTRICTS=['North Ward','Riverside','Old Quarter','Harbor'];
+const BAD_DISTRICTS=['Lowmarsh','East Gate','Pinecross'];
+const SEALS=['sun','tower','wave'], BAD_SEALS=['crown','key','moon'];
+const EVENTS=['rush','inspector','vip','power'];
+const RULES=[
+  {id:'expiry',day:1,short:'Expiry date',text:'Passports must not be expired.'},
+  {id:'photo',day:1,short:'Photo',text:'The passport photo must match the traveler.'},
+  {id:'city',day:2,short:'Issuing city',text:'The issuing city must belong to the passport country.'},
+  {id:'ticket',day:3,short:'Entry ticket',text:'Foreigners need an entry ticket valid on today’s date.'},
+  {id:'names',day:3,short:'Names',text:'The name on every document must match the passport.'},
+  {id:'workpass',day:4,short:'Work pass',text:'Foreign workers need a work pass with their passport number.'},
+  {id:'seal',day:5,short:'Seal',text:'Work passes need a valid Ministry seal.'},
+  {id:'banned',day:6,short:'Closed country',text:'Deny every traveler from the closed country.'},
+  {id:'vaccine',day:7,short:'Vaccine slip',text:'Travelers from listed countries need a Grayfever vaccine slip with their passport number.'},
+  {id:'idcard',day:8,short:'ID card',text:'Citizens need an ID card from a valid district with the same date of birth.'},
+  {id:'stay',day:9,short:'Length of stay',text:'Ask how long they’re staying. The answer must match the entry ticket.'},
+  {id:'height',day:10,short:'Height',text:'The passport height must match the booth height chart, within 4 cm.'},
+  {id:'fingerprint',day:11,short:'Fingerprint',text:'Ask workers for a fingerprint. It must match the one on the work pass.'},
+  {id:'transit',day:12,short:'Transit slip',text:'Transit travelers need a transit slip leaving within 2 days of today.'},
+  {id:'diplomat',day:13,short:'Embassy letter',text:'Diplomats skip the ticket, vaccine and closed-country rules, but need an embassy letter from their own country.'},
+  {id:'consent',day:14,short:'Guardian consent',text:'Travelers under 18 need a guardian consent form. The guardian’s surname must match theirs.'}
+];
+const LINES={
+  visit:['Just visiting family.','A short holiday, nothing more.','I’m here to see the coast.','Visiting a friend in Ollen.','My sister is getting married.'],
+  work:['I start a job in Brask on Monday.','Seasonal work at the harbor.','Contract work. I’m an engineer.','The mill in Vey hired me.'],
+  return:['Coming home.','Back from a trip. Long queue today.','Home at last.','Good evening, officer.'],
+  transit:['Just passing through to the coast.','Changing trains in Brask, then I’m gone.','Transit. I won’t be long.'],
+  diplomatic:['Embassy business. I trust this will be quick.','I’m expected at the ministry.','Diplomatic mission, officer.']
+};
+const FACE_KEYS=['skin','hair','hc','eyes','glasses','beard','shape'];
+function randFace(r){return{skin:r.int(0,4),hair:r.int(0,5),hc:r.int(0,4),eyes:r.int(0,2),glasses:r.chance(.25),beard:r.chance(.25),shape:r.int(0,2),shirt:r.int(0,4)};}
+function sameFace(a,b){return FACE_KEYS.every(k=>a[k]===b[k]);}
+function mutateFace(f,r){const g=Object.assign({},f);const k=r.pick(['hair','glasses','beard','shape']);
+  if(k==='glasses'||k==='beard')g[k]=!g[k];else{const n=k==='hair'?6:3;g[k]=(g[k]+r.int(1,n-1))%n;}return g;}
+const samePrint=(a,b)=>a.type===b.type&&a.v===b.v;
+function mutatePrint(p,r){return r.chance(.7)?{type:(p.type+r.int(1,2))%3,v:p.v}:{type:p.type,v:(p.v+r.int(1,3))%4};}
+const surname=n=>n.split(' ').slice(1).join(' ');
+function alterName(name,r,subtle){const sp=name.split(' ');const first=sp[0],last=sp.slice(1).join(' ');
+  if(subtle||r.chance(.5)){const V='aeiou';const idx=[...last].map((ch,i)=>V.includes(ch)?i:-1).filter(i=>i>=0);
+    if(idx.length){const i=r.pick(idx);const nv=r.pick(V.replace(last[i],'').split(''));return first+' '+last.slice(0,i)+nv+last.slice(i+1);}}
+  let l;do{l=r.pick(LAST);}while(l===last);return first+' '+l;}
+function alterNumber(num,r){const p=num.slice(0,3),n=num.slice(3);const i=r.int(0,n.length-1);return p+n.slice(0,i)+String((+n[i]+r.int(1,9))%10)+n.slice(i+1);}
+const foreign=t=>t.docs.passport.country!==HOME;
+const isMinor=(t,c)=>c.today-t.docs.passport.dob<18*YEAR;
+function setCountry(t,country,r){const pp=t.docs.passport;pp.country=country;pp.city=r.pick(COUNTRIES[country]);pp.number=CODES[country]+'-'+r.int(10000,99999);
+  t.country=country;if(t.docs.work)t.docs.work.number=pp.number;if(t.docs.vaccine)t.docs.vaccine.number=pp.number;}
+const I=(rule,text,fields,say,crime)=>({rule,text,fields,say,crime:!!crime});
+
+const CHECK={
+  expiry:(t,c)=>t.docs.passport.expiry<c.today?I('expiry','The passport is expired.',['passport.expiry','desk.date'],'Expired? I was sure I renewed it.'):null,
+  photo:(t)=>!sameFace(t.docs.passport.face,t.face)?I('photo','The photo doesn’t match the traveler. An impostor.',['passport.photo','booth.face'],'I… changed my look. It’s still me.',true):null,
+  city:(t)=>{const p=t.docs.passport;return COUNTRIES[p.country].includes(p.city)?null:I('city','The issuing city isn’t in that country. A forged passport.',['passport.city','rule.city'],'That’s where they printed it, I swear.',true);},
+  ticket:(t,c)=>{if(!foreign(t)||t.docs.passport.diplomat)return null;const d=t.docs;
+    if(!d.ticket)return I('ticket','No entry ticket.',['rule.ticket','passport.country'],'The ticket office was closed!');
+    if(d.ticket.date!==c.today)return I('ticket','The entry ticket is for a different day.',['ticket.date','desk.date'],'I bought it for the wrong day?');return null;},
+  names:(t)=>{const d=t.docs;for(const k of ['ticket','work','vaccine','id','transit','letter','consent'])if(d[k]&&d[k].name!==d.passport.name)
+    return I('names','A name doesn’t match the passport.',[k+'.name','passport.name'],'A clerk must have misspelled it.');return null;},
+  workpass:(t)=>{if(!foreign(t)||t.purpose!=='work')return null;const d=t.docs;
+    if(!d.work)return I('workpass','A foreign worker without a work pass.',['rule.workpass','booth.purpose'],'My employer said I didn’t need one.');
+    if(d.work.number!==d.passport.number)return I('workpass','The work pass has a different passport number.',['work.number','passport.number'],'They must have typed it wrong.');return null;},
+  seal:(t)=>t.docs.work&&!SEALS.includes(t.docs.work.seal)?I('seal','The work pass seal is fake. A forgery.',['work.seal','rule.seal'],'It’s the seal they gave me!',true):null,
+  banned:(t,c)=>c.banned&&t.docs.passport.country===c.banned&&!t.docs.passport.diplomat?I('banned','That country is closed today.',['passport.country','rule.banned'],'Nobody told me the border was closed.'):null,
+  vaccine:(t,c)=>{const d=t.docs;if(!c.vaccine.includes(d.passport.country)||d.passport.diplomat)return null;
+    if(!d.vaccine)return I('vaccine','No vaccine slip.',['rule.vaccine','passport.country'],'I’m not sick. Look at me.');
+    if(d.vaccine.number!==d.passport.number)return I('vaccine','The vaccine slip has a different passport number.',['vaccine.number','passport.number'],'That’s my slip, really.');return null;},
+  idcard:(t)=>{if(foreign(t))return null;const d=t.docs;
+    if(!d.id)return I('idcard','A citizen without an ID card.',['rule.idcard','passport.country'],'I left my ID at home.');
+    if(d.id.dob!==d.passport.dob)return I('idcard','The birth dates don’t match.',['id.dob','passport.dob'],'Everyone mixes up birthdays.');
+    if(!DISTRICTS.includes(d.id.district))return I('idcard','The ID card district doesn’t exist.',['id.district','rule.idcard'],'It’s a real place. Ask anyone.');return null;},
+  stay:(t)=>t.docs.ticket&&t.answers.stay!==t.docs.ticket.stay?I('stay','Their stay doesn’t match the ticket.',['answer.stay','ticket.stay'],'Did I say that? I meant… the other number.'):null,
+  height:(t)=>Math.abs(t.docs.passport.height-t.height)>4?I('height','Their height doesn’t match the passport.',['passport.height','booth.height'],'I’m wearing different shoes.'):null,
+  fingerprint:(t)=>t.docs.work&&!samePrint(t.docs.work.print,t.print)?I('fingerprint','The fingerprint doesn’t match the work pass. Someone else’s pass.',['work.print','booth.print'],'The ink must have smudged.',true):null,
+  transit:(t,c)=>{if(t.purpose!=='transit')return null;const d=t.docs;
+    if(!d.transit)return I('transit','A transit traveler without a transit slip.',['rule.transit','booth.purpose'],'Nobody gave me a slip.');
+    if(d.transit.until<c.today||d.transit.until>c.today+2)return I('transit','The transit slip isn’t for the next 2 days.',['transit.until','desk.date'],'The train schedule changed.');return null;},
+  diplomat:(t)=>{const d=t.docs;if(!d.passport.diplomat)return null;
+    if(!d.letter)return I('diplomat','A diplomat without an embassy letter.',['rule.diplomat','passport.country'],'My aide has the letter. Somewhere.');
+    if(d.letter.country!==d.passport.country)return I('diplomat','The embassy letter is from the wrong country. A forgery.',['letter.country','passport.country'],'Our embassies share an office.',true);return null;},
+  consent:(t,c)=>{if(!isMinor(t,c))return null;const d=t.docs;
+    if(!d.consent)return I('consent','A minor without a guardian consent form.',['rule.consent','passport.dob'],'My mum is meeting me on the other side!');
+    if(surname(d.consent.guardian)!==surname(d.passport.name))return I('consent','The guardian’s surname doesn’t match.',['consent.guardian','passport.name'],'She’s my aunt. It’s complicated.');return null;}
+};
+const PLANT={
+  expiry:(t,c,r)=>{t.docs.passport.expiry=c.today-r.int(1,300);return true;},
+  photo:(t,c,r)=>{t.docs.passport.face=mutateFace(t.face,r);return true;},
+  city:(t,c,r)=>{const p=t.docs.passport;const o=r.pick(Object.keys(COUNTRIES).filter(k=>k!==p.country));p.city=r.pick(COUNTRIES[o]);return true;},
+  ticket:(t,c,r)=>{const d=t.docs;if(!foreign(t)||!d.ticket)return false;if(r.chance(.5))delete d.ticket;else d.ticket.date=c.today+(r.chance(.5)?1:-1)*r.int(1,20);return true;},
+  names:(t,c,r,o)=>{const ks=['ticket','work','vaccine','id','transit','letter','consent'].filter(k=>t.docs[k]);if(!ks.length)return false;const k=r.pick(ks);t.docs[k].name=alterName(t.docs.passport.name,r,o&&o.subtle);return true;},
+  workpass:(t,c,r)=>{const d=t.docs;if(!d.work)return false;if(r.chance(.5))delete d.work;else d.work.number=alterNumber(d.work.number,r);return true;},
+  seal:(t,c,r)=>{if(!t.docs.work)return false;t.docs.work.seal=r.pick(BAD_SEALS);return true;},
+  banned:(t,c,r)=>{if(!foreign(t)||!c.banned||t.docs.passport.diplomat||t.docs.passport.country===c.banned)return false;setCountry(t,c.banned,r);return true;},
+  vaccine:(t,c,r)=>{const d=t.docs;if(!d.vaccine)return false;if(r.chance(.5))delete d.vaccine;else d.vaccine.number=alterNumber(d.vaccine.number,r);return true;},
+  idcard:(t,c,r)=>{const d=t.docs;if(!d.id)return false;const v=r.int(0,2);if(v===0)delete d.id;else if(v===1)d.id.dob+=r.int(1,900)*(r.chance(.5)?1:-1);else d.id.district=r.pick(BAD_DISTRICTS);return true;},
+  stay:(t,c,r)=>{if(!t.docs.ticket)return false;let s;do{s=r.int(1,40);}while(s===t.docs.ticket.stay);t.answers.stay=s;return true;},
+  height:(t,c,r)=>{t.docs.passport.height=t.height+(r.chance(.5)?1:-1)*r.int(8,20);return true;},
+  fingerprint:(t,c,r)=>{if(!t.docs.work)return false;t.docs.work.print=mutatePrint(t.print,r);return true;},
+  transit:(t,c,r)=>{const d=t.docs;if(t.purpose!=='transit'||!d.transit)return false;const v=r.int(0,2);
+    if(v===0)delete d.transit;else d.transit.until=v===1?c.today+r.int(4,15):c.today-r.int(1,5);return true;},
+  diplomat:(t,c,r)=>{const d=t.docs;if(!d.passport.diplomat||!d.letter)return false;
+    if(r.chance(.4))delete d.letter;else d.letter.country=r.pick(FOREIGN.filter(x=>x!==d.passport.country));return true;},
+  consent:(t,c,r)=>{const d=t.docs;if(!d.consent)return false;if(r.chance(.5))delete d.consent;
+    else{let l;do{l=r.pick(LAST);}while(l===surname(d.passport.name));d.consent.guardian=d.consent.guardian.split(' ')[0]+' '+l;}return true;}
+};
+function makeDay(day,seed,over){over=over||{};const r=rng((seed^Math.imul(day,7919))>>>0);
+  const rules=new Set(RULES.filter(x=>x.day<=day).map(x=>x.id));
+  const c={day,today:over.today||day,rules,banned:null,vaccine:[],event:null,vipAt:r.int(2,6)};
+  if(rules.has('banned'))c.banned=over.banned||r.pick(FOREIGN);
+  if(rules.has('vaccine'))c.vaccine=over.vaccine||r.shuffle(FOREIGN.filter(x=>x!==c.banned)).slice(0,2);
+  const roll=r.f(),pick=r.pick(EVENTS);
+  c.event='event' in over?over.event:(day>=3&&roll<.4?pick:null);
+  return c;}
+function audit(t,c){return RULES.filter(x=>c.rules.has(x.id)).map(x=>CHECK[x.id](t,c)).filter(Boolean);}
+function finalize(t,c){t.issues=audit(t,c);t.crime=t.issues.some(i=>i.crime);return t;}
+function makeTraveler(c,r,o){o=o||{};const R=c.rules;
+  const citizen=o.country?o.country===HOME:r.chance(.3);
+  const country=o.country||(citizen?HOME:r.pick(FOREIGN.filter(x=>x!==c.banned)));
+  const diplomat=!citizen&&!o.purpose&&R.has('diplomat')&&r.chance(.12);
+  const purpose=o.purpose||(citizen?'return':diplomat?'diplomatic':(R.has('transit')&&r.chance(.2)?'transit':(r.chance(.35)?'work':'visit')));
+  const minor=R.has('consent')&&!diplomat&&purpose!=='work'&&r.chance(.12);
+  const face=o.face||randFace(r);
+  const name=o.name||(r.pick(FIRST)+' '+r.pick(LAST));
+  const dob=minor?c.today-r.int(8*YEAR,17*YEAR):c.today-r.int(18*YEAR,75*YEAR);
+  const height=minor?r.int(125,170):r.int(152,198);
+  const print={type:r.int(0,2),v:r.int(0,3)};
+  const pp={name,country,city:r.pick(COUNTRIES[country]),number:CODES[country]+'-'+r.int(10000,99999),dob,expiry:c.today+r.int(20,3000),face:Object.assign({},face),height};
+  if(diplomat)pp.diplomat=true;
+  const d={passport:pp};
+  if(!citizen&&!diplomat&&R.has('ticket'))d.ticket={name,date:c.today,stay:r.int(2,30)};
+  if(!citizen&&purpose==='work'&&R.has('workpass'))d.work={name,number:pp.number,seal:r.pick(SEALS),until:c.today+r.int(30,700),print:Object.assign({},print)};
+  if(!diplomat&&R.has('vaccine')&&c.vaccine.includes(country))d.vaccine={name,number:pp.number,date:c.today-r.int(5,300)};
+  if(citizen&&R.has('idcard'))d.id={name,dob,district:r.pick(DISTRICTS)};
+  if(purpose==='transit')d.transit={name,until:c.today+r.int(0,2)};
+  if(diplomat)d.letter={name,country};
+  if(minor)d.consent={name,guardian:r.pick(FIRST)+' '+surname(name)};
+  const t={name,country,purpose,face,height,print,docs:d,planted:[],answers:{stay:d.ticket?d.ticket.stay:null}};
+  const p=o.p!=null?o.p:0.4;
+  if(r.chance(p)){let n=r.chance(.2)?2:1;for(const id of r.shuffle([...R])){if(n<=0)break;if(PLANT[id](t,c,r,o)){t.planted.push(id);n--;}}}
+  finalize(t,c);
+  t.say=r.pick(LINES[purpose]);
+  return t;}
+G.BD={fmtDate,rng,HOME,COUNTRIES,CODES,FOREIGN,DISTRICTS,BAD_DISTRICTS,SEALS,BAD_SEALS,EVENTS,RULES,CHECK,PLANT,makeDay,makeTraveler,audit,finalize,sameFace,samePrint,alterName,alterNumber,isMinor,surname,YEAR};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+
+<!-- ============ game UI ============ -->
+<script>
+(function(){
+'use strict';
+const BD=window.BD, $=id=>document.getElementById(id);
+const PAGES_URL='https://dave098-1.github.io/passport-control-game/';
+const ARTIFACT_URL='https://claude.ai/artifact/T7X67Cxe17RTTxAJUi8QPT';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const WIDE=()=>{try{return matchMedia('(min-width:900px)').matches;}catch(e){return true;}};
+const rand32=()=>(Math.random()*2**31)>>>0;
+const fmtTime=s=>{s=Math.max(0,s);const m=Math.floor(s/60);return m+':'+(s%60).toFixed(1).padStart(4,'0');};
+
+/* ================= platform + iOS gate ================= */
+const UA=navigator.userAgent;
+const IS_IPAD=/iPad/.test(UA)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const IS_IOS=/iPhone|iPod/.test(UA)||IS_IPAD;
+const mq=q=>{try{return matchMedia(q).matches;}catch(e){return false;}};
+const IS_STANDALONE=navigator.standalone===true||mq('(display-mode: standalone)')||mq('(display-mode: fullscreen)');
+const ON_PAGES=location.hostname.endsWith('github.io');
+const SHARE_ICO='<svg class="ios-ico" viewBox="0 0 24 24" aria-label="Share"><path d="M12 3v12M8 7l4-4 4 4M6 11H5v10h14V11h-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ADD_ICO='<svg class="ios-ico" viewBox="0 0 24 24" aria-label="Add"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+function showGate(){
+  const inApp=/FBAN|FBAV|Instagram|Line\/|GSA\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly/.test(UA);
+  const other=/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/.test(UA);
+  const steps=[],arrow=$('gate-arrow');let note='';
+  const addSteps=[`Scroll down the list and tap <b>Add to Home Screen</b> ${ADD_ICO}.`,
+    `Make sure <b>Open as Web App</b> is switched on if you see it, then tap <b>Add</b>.`,
+    `Close the browser and open <b>Border Desk</b> from your Home Screen.`];
+  if(inApp){
+    steps.push(`Tap the <b>⋯</b> or browser menu in this app and choose <b>Open in Safari</b>. If there isn't one, copy the link below and paste it into Safari.`,
+      `In Safari, tap the <b>Share</b> button ${SHARE_ICO}.`,...addSteps);
+    $('gate-copy').hidden=false;arrow.setAttribute('class','arrow up');
+  }else if(other){
+    steps.push(`Tap the <b>Share</b> button ${SHARE_ICO} in the address bar. In Firefox it's inside the <b>☰</b> menu.`,...addSteps);
+    note='Adding to the Home Screen from Chrome, Edge or Firefox needs iOS 16.4 or later. If you can’t find Add to Home Screen, open this page in Safari instead.';
+    $('gate-copy').hidden=false;arrow.setAttribute('class','arrow up');
+  }else{
+    steps.push(IS_IPAD?`Tap the <b>Share</b> button ${SHARE_ICO} at the top right of Safari.`
+      :`Tap the <b>Share</b> button ${SHARE_ICO} in the toolbar at the bottom of Safari. On iOS 26, tap <b>⋯</b> first, then <b>Share</b>.`,...addSteps);
+    arrow.setAttribute('class',IS_IPAD?'arrow up':'arrow down');
+  }
+  $('gate-steps').innerHTML=steps.map(s=>`<li><span>${s}</span></li>`).join('');
+  $('gate-note').textContent=note;
+  const link=ON_PAGES?location.href.split('#')[0]:PAGES_URL;
+  $('gate-url').textContent=link;
+  $('gate-copy-btn').onclick=e=>{const done=()=>{e.target.textContent='Copied';};
+    try{navigator.clipboard.writeText(link).then(done,()=>selectText($('gate-url')));}catch(err){selectText($('gate-url'));}};
+  $('gate').hidden=false;
+}
+function selectText(el){const s=getSelection(),r=document.createRange();r.selectNodeContents(el);s.removeAllRanges();s.addRange(r);}
+
+/* ================= save ================= */
+const SAVE_KEY='borderdesk.v1';
+let SV={arcadeMax:0,best:{},endless:0,story:null,sound:true,crowns:0,upgrades:{},tips:{},tutorialDone:false,nick:''};
+try{Object.assign(SV,JSON.parse(localStorage.getItem(SAVE_KEY))||{});}catch(e){}
+if(SV.seenHow&&!('tutorialDone' in (JSON.parse(localStorage.getItem(SAVE_KEY)||'{}')||{})))SV.tutorialDone=true;
+SV.upgrades=SV.upgrades||{};SV.tips=SV.tips||{};
+if(!SV.nick)SV.nick='Officer '+(10+Math.floor(Math.random()*90));
+function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SV));}catch(e){}}
+
+/* ================= audio ================= */
+let AC=null;
+function sound(kind){if(!SV.sound)return;try{
+  AC=AC||new (window.AudioContext||window.webkitAudioContext)();const t=AC.currentTime;
+  if(kind==='stamp'){const len=.18,buf=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3);
+    const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();f.type='lowpass';f.frequency.value=600;g.gain.value=1.2;
+    s.buffer=buf;s.connect(f).connect(g).connect(AC.destination);s.start(t);return;}
+  const o=AC.createOscillator(),g=AC.createGain();o.connect(g).connect(AC.destination);
+  const P={good:['sine',880,.18,.18],bad:['square',110,.35,.12],ding:['triangle',660,.25,.15],soft:['sine',220,.15,.12],tick:['sine',520,.12,.15],go:['triangle',990,.35,.18]}[kind];
+  o.type=P[0];o.frequency.setValueAtTime(P[1],t);if(kind==='good')o.frequency.setValueAtTime(1320,t+.08);
+  g.gain.setValueAtTime(P[3],t);g.gain.exponentialRampToValueAtTime(.001,t+P[2]);o.start(t);o.stop(t+P[2]);
+}catch(e){}}
+
+/* ================= art ================= */
+const SKIN=['#f1d3b6','#e0b08a','#c68b5e','#9a6440','#6b4329'];
+const HAIRC=['#1e1a17','#5a3a22','#a8763e','#d9c27a','#8d8d8d'];
+const SHIRT=['#3d5a73','#6b3e3e','#4f6b45','#5c4f78','#7a6a48'];
+const COVER={Veldmark:'#2f5d50',Corvel:'#7a2e2e',Ostrand:'#2e4a7a',Pelagia:'#5f4a82',Tirrin:'#8a6a2e',Lumeno:'#2b7069',Zemora:'#4f5257'};
+function faceSVG(f){
+  const sk=SKIN[f.skin],hc=HAIRC[f.hc],sh=SHIRT[f.shirt||0];
+  const rx=[26,29,24][f.shape],ry=[31,29,34][f.shape],cx=50,cy=56,top=cy-ry;
+  const crop=`<path d="M${cx-rx-1} ${cy-4}Q${cx-rx} ${top-6} ${cx} ${top-5}Q${cx+rx} ${top-6} ${cx+rx+1} ${cy-4}Q${cx+rx-4} ${top+10} ${cx} ${top+9}Q${cx-rx+4} ${top+10} ${cx-rx-1} ${cy-4}Z" fill="${hc}"/>`;
+  let back='',hair='';
+  switch(f.hair){
+    case 0:hair=crop;break;
+    case 1:back=`<path d="M${cx-rx-6} ${cy+28}Q${cx-rx-9} ${top-9} ${cx} ${top-8}Q${cx+rx+9} ${top-9} ${cx+rx+6} ${cy+28}Z" fill="${hc}"/>`;
+      hair=`<path d="M${cx-rx} ${cy-2}Q${cx-rx+2} ${top-4} ${cx} ${top-4}Q${cx+rx-2} ${top-4} ${cx+rx} ${cy-2}Q${cx+rx-8} ${top+8} ${cx} ${top+8}Q${cx-rx+8} ${top+8} ${cx-rx} ${cy-2}Z" fill="${hc}"/>`;break;
+    case 2:hair=`<circle cx="${cx}" cy="${top-7}" r="10" fill="${hc}"/>`+crop;break;
+    case 3:hair=`<rect x="${cx-rx}" y="${top-10}" width="${rx*2}" height="19" rx="4" fill="${hc}"/>`;break;
+    case 4:hair=`<path d="M${cx-rx-2} ${cy-2}Q${cx-rx-4} ${top-8} ${cx+4} ${top-6}Q${cx+rx+4} ${top-4} ${cx+rx+2} ${cy-8}Q${cx+rx-6} ${top+6} ${cx-6} ${top+14}Q${cx-rx+2} ${top+16} ${cx-rx-2} ${cy-2}Z" fill="${hc}"/>`;break;
+  }
+  const ey=cy-2;let eyes='';
+  for(const ex of [cx-10,cx+10]){
+    if(f.eyes===0)eyes+=`<circle cx="${ex}" cy="${ey}" r="2.6" fill="#1d1d1d"/>`;
+    else if(f.eyes===1)eyes+=`<ellipse cx="${ex}" cy="${ey}" rx="3.4" ry="1.5" fill="#1d1d1d"/>`;
+    else eyes+=`<ellipse cx="${ex}" cy="${ey}" rx="4" ry="2.7" fill="#fff"/><circle cx="${ex}" cy="${ey}" r="1.9" fill="#1d1d1d"/>`;
+    eyes+=`<path d="M${ex-5} ${ey-7}L${ex+5} ${ey-8}" stroke="${hc}" stroke-width="2.4" stroke-linecap="round"/>`;
+  }
+  const beard=f.beard?`<path d="M${cx-rx+2} ${cy+4}Q${cx-rx+4} ${cy+ry+4} ${cx} ${cy+ry+5}Q${cx+rx-4} ${cy+ry+4} ${cx+rx-2} ${cy+4}Q${cx+rx-8} ${cy+22} ${cx} ${cy+21}Q${cx-rx+8} ${cy+22} ${cx-rx+2} ${cy+4}Z" fill="${hc}"/>`:'';
+  const glasses=f.glasses?`<g fill="rgba(255,255,255,.15)" stroke="#111" stroke-width="2"><circle cx="${cx-10}" cy="${ey}" r="6.5"/><circle cx="${cx+10}" cy="${ey}" r="6.5"/><path d="M${cx-3.5} ${ey}h7" fill="none"/></g>`:'';
+  return `<svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M6 120Q10 92 50 89Q90 92 94 120Z" fill="${sh}"/><rect x="${cx-8}" y="${cy+ry-8}" width="16" height="16" fill="${sk}"/>${back}<ellipse cx="${cx-rx}" cy="${cy}" rx="4" ry="7" fill="${sk}"/><ellipse cx="${cx+rx}" cy="${cy}" rx="4" ry="7" fill="${sk}"/><ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${sk}"/>${hair}${eyes}<path d="M${cx} ${cy+2}q-3 8 1 9" stroke="rgba(0,0,0,.35)" stroke-width="1.6" fill="none"/>${beard}<path d="M${cx-7} ${cy+15}Q${cx} ${cy+19} ${cx+7} ${cy+15}" stroke="#6b2e2a" stroke-width="2" fill="none" stroke-linecap="round"/>${glasses}</svg>`;
+}
+function sealSVG(k){
+  let rays='';for(let i=0;i<8;i++){const a=i*Math.PI/4;rays+=`<line x1="${22+Math.cos(a)*9}" y1="${22+Math.sin(a)*9}" x2="${22+Math.cos(a)*13}" y2="${22+Math.sin(a)*13}" stroke="currentColor" stroke-width="2"/>`;}
+  const P={sun:`<circle cx="22" cy="22" r="6" fill="currentColor"/>${rays}`,
+    tower:'<path d="M15 31V16h3v-3h3v3h2v-3h3v3h3v15z" fill="currentColor"/>',
+    wave:'<path d="M10 25q3-5 6 0t6 0t6 0t6 0M10 18q3-5 6 0t6 0t6 0t6 0" fill="none" stroke="currentColor" stroke-width="2.5"/>',
+    crown:'<path d="M12 29l-1-12 6 5 5-8 5 8 6-5-1 12z" fill="currentColor"/>',
+    key:'<circle cx="16" cy="22" r="5" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M21 22h12M29 22v4M32 22v3" stroke="currentColor" stroke-width="2.5"/>',
+    moon:'<path d="M26 12a10 10 0 1 0 0 20a8 8 0 1 1 0-20z" fill="currentColor"/>'};
+  return `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/>${P[k]}</svg>`;
+}
+let PID=0;
+function printSVG(p){
+  const id='pc'+(++PID),rot=[0,35,-35,70][p.v];let g='';
+  if(p.type===0)for(let i=1;i<=7;i++)g+=`<ellipse cx="30" cy="34" rx="${i*3.4}" ry="${i*4.3}"/>`;
+  else if(p.type===1)for(let i=1;i<=7;i++)g+=`<path d="M${30-i*3.4} 70V34a${i*3.4} ${i*3.4} 0 0 1 ${i*6.8} 0V70"/>`;
+  else for(let i=0;i<9;i++)g+=`<path d="M0 ${62-i*6}Q30 ${44-i*8} 60 ${62-i*6}"/>`;
+  return `<svg viewBox="0 0 60 68" aria-hidden="true"><defs><clipPath id="${id}"><ellipse cx="30" cy="34" rx="26" ry="31"/></clipPath></defs><ellipse cx="30" cy="34" rx="27" ry="32" fill="#f7f1e3" stroke="#8a7f68"/><g clip-path="url(#${id})"><g fill="none" stroke="#3a3328" stroke-width="1.7" transform="rotate(${rot} 30 34)">${g}</g></g></svg>`;
+}
+
+/* ================= story content ================= */
+const BREL='Chief Brel', IVO='Ivo, booth two';
+const STORY={
+  intro:{
+    1:[[BREL,'Welcome to the Eastern Checkpoint, officer. Today there are two rules: no expired passports, and the face must match the photo.'],[BREL,'Approve good papers, deny bad ones. Impostors and forgers get detained. Every mistake goes on your record.'],[IVO,'I’m Ivo. Keep your head down and you’ll be fine.']],
+    2:[[BREL,'The Ministry found forged passports printed in cities that don’t exist. Check the issuing city against the list in your rulebook.']],
+    3:[[BREL,'From today, foreigners need an entry ticket for today’s date. Every name must match the passport.'],[IVO,'Tickets. More paper. Wonderful.']],
+    4:[[BREL,'Foreign workers now need a work pass that carries their passport number.'],[IVO,'There’s a reporter hanging around the queue. Don’t talk to her.']],
+    5:[[BREL,'Fake work passes are going around. Only the Sun, Tower and Wave seals are real. A fake seal is a forgery: detain them.'],[IVO,'Rush hour today. And some of the regulars tip well, if you know what I mean. Nobody checks.']],
+    6:[[BREL,'Talks with Ostrand broke down overnight. One country will be closed each day from now on. Read the rulebook every morning.']],
+    7:[[BREL,'Grayfever cases in the region. Travelers from the listed countries need a vaccine slip.'],[BREL,'A Ministry inspector is sitting in today. Mistakes count double. And the closed country is Zemora.']],
+    8:[[BREL,'Our own citizens now show an ID card. Check the district and the date of birth.']],
+    9:[[BREL,'A word before you start. Someone at this checkpoint is taking money. I think it’s Ivo.'],
+       {choice:'Will you put your name to a report about Ivo?',options:[
+         {label:'Report Ivo',fn:F=>{F.reported=true;},reply:[[BREL,'Thank you. It won’t be forgotten.']]},
+         {label:'Say you saw nothing',fn:F=>{F.reported=false;},reply:[[BREL,'Hm. Back to work, then.']]}]},
+       [BREL,'New rule: ask travelers how long they’re staying. It must match their ticket. And the power is out again, so use your torch.']],
+    10:[[BREL,'Last day of your probation. Height charts are up in every booth: passport heights must match.'],[IVO,'Whatever happens, it was good working next to you.']]
+  },
+  over:{1:{event:null},2:{event:null},3:{event:null},4:{event:null},5:{event:'rush'},6:{banned:'Ostrand',event:null},7:{banned:'Zemora',vaccine:['Corvel','Tirrin'],event:'inspector'},
+    8:{banned:'Pelagia',event:null},9:{banned:'Tirrin',event:'power'},10:{banned:'Corvel',event:null}},
+  scripted:{
+    3:[{at:3,name:'Anni Desh',country:'Tirrin',purpose:'visit',mutate:t=>{delete t.docs.ticket;},
+        say:'Please, officer. My husband Pavel lives in Brask. The ticket office closed before I reached it. I can’t go back.',
+        decide:(k,F)=>{F.anni=k==='approve'?'in':'out';if(k==='approve')F.mercy++;}}],
+    4:[{at:2,name:'Mara Tellen',country:'Lumeno',purpose:'visit',say:'Mara Tellen, Lumeno Herald. People in the queue say they’ve waited three days. Is that true?'}],
+    5:[{at:4,name:'Fenn Kovac',country:'Zemora',purpose:'work',mutate:t=>{t.docs.work.seal='crown';},
+        say:'Fenn Kovac. My pass is fine, I promise. And something for your trouble…',decide:(k,F)=>{if(k==='detain')F.fennCaught=true;},
+        choice:{text:'He slides 50 crowns under the glass.',options:[{label:'Take the money',fn:(F,D)=>{F.bribes++;D.score+=50;}},{label:'Push it back',fn:()=>{}}]}}],
+    6:[{at:2,name:'Pavel Desh',country:'Veldmark',purpose:'return',
+        say:F=>F.anni==='in'?'You’re the one who let Anni through? Thank you. We have a home again.':F.anni==='out'?'My wife was turned back here. I’m going to Tirrin to bring her the right papers.':'Coming home. Long queue today.'}],
+    7:[{at:5,name:'Fenn Kovac',country:'Zemora',purpose:'visit',skip:F=>F.fennCaught,
+        say:'Zemora’s closed, I know. A hundred crowns says it isn’t, for me.',
+        choice:{text:'He slides 100 crowns under the glass.',options:[{label:'Take the money',fn:(F,D)=>{F.bribes++;D.score+=100;}},{label:'Push it back',fn:()=>{}}]}}],
+    8:[{at:3,name:'Mara Tellen',country:'Lumeno',purpose:'work',mutate:(t,c,r)=>{t.docs.work.number=BD.alterNumber(t.docs.work.number,r);},
+        say:'They refused my press pass and sold me this work pass instead. The number’s wrong, I know. I’m writing about this border. Let me in.',
+        decide:(k,F)=>{if(k==='approve'){F.mercy++;F.mara=true;}}}],
+    10:[{at:4,name:'Fenn Kovac',country:'Zemora',purpose:'visit',skip:F=>F.fennCaught,mutate:(t,c)=>{t.docs.passport.expiry=c.today-40;},
+        say:'Last time, officer. Two hundred crowns, and you never see me again.',
+        choice:{text:'He slides 200 crowns under the glass.',options:[{label:'Take the money',fn:(F,D)=>{F.bribes++;D.score+=200;}},{label:'Push it back',fn:()=>{}}]}}]
+  }
+};
+function storyEnding(st){
+  const F=st.flags,fenn=F.fennCaught?' Fenn Kovac sits in a cell in Brask because of you.':'';
+  if(st.cites>=15)return['Dismissed','Your record has too many citations. The Ministry ends your probation, and you hand in your stamp at the gate you used to guard.'];
+  if(F.bribes>0)return['Pocket Lined',F.reported?'Ivo is questioned, and he names you too. You both lose your posts. You keep the money, for now.':'You and Ivo split the regulars between you. The money is good. Every knock at the door makes you jump.'];
+  if(F.mercy>0)return['Open Door',(F.mara?'Mara’s article about the Eastern Checkpoint runs on the front page. ':'')+'People in the queue start asking for your booth by name. '+(F.anni==='in'?'Anni and Pavel Desh send a card. ':'')+'Brel pretends not to notice.'+fenn];
+  return['Model Officer',(F.reported?'Ivo is transferred. You take booth one for good, and Brel trusts you with the keys.':'Your record is spotless. The Ministry makes your post permanent. The queue never gets shorter.')+fenn];
+}
+
+/* ================= events + shop ================= */
+const EVENT_INFO={rush:['Rush hour','A two-minute shift. Travelers come twice as fast, and points count ×1.5.'],
+  inspector:['Inspector visit','A Ministry inspector is watching. Correct calls and citations both count double.'],
+  vip:['VIP crossing','Someone important comes through today. Don’t let them push you around.'],
+  power:['Power cut','The desk lights are out. Tap a document to light it with your torch for 4 seconds.']};
+const SHOP=[
+  {id:'quick',name:'Quick stamp',price:80,text:'The next traveler steps up almost at once.'},
+  {id:'checklist',name:'Checklist card',price:100,text:'Shows which rules apply to the traveler in front of you.'},
+  {id:'thermos',name:'Thermos',price:120,text:'+20 seconds on every arcade shift.'},
+  {id:'uv',name:'UV lamp',price:150,text:'A UV button: fake seals and forged letters glow, real passports show a watermark. Beats power cuts.'},
+  {id:'charm',name:'Lucky charm',price:200,text:'Your first citation each shift is forgiven. One extra life in Endless.'}];
+
+/* ================= helpers ================= */
+const NAMES={visit:'Visit',work:'Work',return:'Returning citizen',transit:'Transit',diplomatic:'Diplomatic'};
+function overlay(html){$('overlay-card').innerHTML=html;$('overlay').hidden=false;}
+function closeOverlay(){$('overlay').hidden=true;}
+function show(id){for(const s of ['menu','game'])$(s).hidden=s!==id;}
+let PAUSED=false, DESKS=[];
+function F(key,label,val){return `<button type="button" class="f" data-key="${key}"><span class="lbl">${label}</span><span class="val">${esc(val)}</span></button>`;}
+function applicable(t,c){const d=t.docs,p=d.passport,f=p.country!==BD.HOME,R=id=>c.rules.has(id),L=[];
+  if(R('expiry'))L.push('Expiry');if(R('photo'))L.push('Photo');if(R('city'))L.push('Issuing city');
+  if(R('ticket')&&f&&!p.diplomat)L.push('Entry ticket');if(R('names')&&Object.keys(d).length>1)L.push('Names');
+  if(R('workpass')&&f&&t.purpose==='work')L.push('Work pass');if(R('seal')&&d.work)L.push('Seal');
+  if(R('banned')&&f&&!p.diplomat)L.push('Closed country');if(R('vaccine')&&c.vaccine.includes(p.country)&&!p.diplomat)L.push('Vaccine slip');
+  if(R('idcard')&&!f)L.push('ID card');if(R('stay')&&d.ticket)L.push('Stay (ask)');if(R('height'))L.push('Height');
+  if(R('fingerprint')&&d.work)L.push('Fingerprint (ask)');if(R('transit')&&t.purpose==='transit')L.push('Transit slip');
+  if(R('diplomat')&&p.diplomat)L.push('Embassy letter');if(R('consent')&&BD.isMinor(t,c))L.push('Guardian consent');return L;}
+
+/* ================= rulebook (shared) ================= */
+function renderBook(c,newDay){
+  let h=`<h3>Bulletin · ${BD.fmtDate(c.today)}</h3>`;
+  if(c.event)h+=`<div class="small-note"><b style="color:var(--lamp)">${EVENT_INFO[c.event][0]}:</b> ${EVENT_INFO[c.event][1]}</div>`;
+  for(const r of BD.RULES){if(!c.rules.has(r.id))continue;
+    let extra='';
+    if(r.id==='city')extra='<table>'+Object.entries(BD.COUNTRIES).map(([k,v])=>`<tr><td>${k}</td><td>${v.join(', ')}</td></tr>`).join('')+'</table>';
+    if(r.id==='seal')extra=`<div class="seals">${BD.SEALS.map(sealSVG).join('')}</div><span class="small-note">Sun · Tower · Wave</span>`;
+    if(r.id==='banned')extra=`<b style="color:var(--deny);font-family:var(--mono)">Closed today: ${c.banned}</b>`;
+    if(r.id==='vaccine')extra=`<span style="font-family:var(--mono)">Slip required from: <b>${c.vaccine.join(', ')}</b></span>`;
+    if(r.id==='idcard')extra=`<span class="small-note">Valid districts: ${BD.DISTRICTS.join(', ')}</span>`;
+    const isNew=newDay&&r.day===newDay;
+    h+=`<button type="button" class="rule f${isNew?' new':''}" data-key="rule.${r.id}" data-rule="${r.id}">${isNew?'<span class="tag">NEW TODAY</span>':''}<span>${r.text}</span>${extra}</button>`;
+  }
+  $('book-body').innerHTML=h;$('book-body').scrollTop=0;
+}
+function openBook(){$('book').classList.add('open');}
+function closeBook(){$('book').classList.remove('open');}
+
+/* ================= the Desk: one player's booth ================= */
+const DESK_HTML=d=>`
+<header class="hud">
+  ${d.layout==='solo'&&!d.online?'<button class="icon-btn btn-pause" type="button" aria-label="Pause"><svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="currentColor"/></svg></button>':''}
+  <div class="hud-day"></div>
+  <button class="f hud-date" type="button" data-key="desk.date" aria-label="Today's date"></button>
+  <span class="hud-event" hidden></span>
+  <div class="hud-mid"></div>
+  <div class="hud-score"><span class="sc"></span><small class="mult"></small></div>
+</header>
+<div class="race-strip" hidden></div>
+<div class="main">
+  <section class="booth" aria-label="Traveler">
+    <button class="f face-btn" type="button" data-key="booth.face" aria-label="The traveler's face"></button>
+    <div class="talk">
+      <div class="who"></div>
+      <p class="speech" aria-live="polite"></p>
+      <div class="chips-row"><button class="f chip purpose" type="button" data-key="booth.purpose"></button><button class="f chip height" type="button" data-key="booth.height" hidden></button></div>
+      <div class="row"><button class="btn small ask-btn" type="button">Ask a question</button></div><div class="ask-menu" hidden></div><div class="transcript"></div>
+      <div class="checklist" hidden></div>
+    </div>
+  </section>
+  <section class="desk" aria-label="Documents">
+    <div class="inspect-bar" hidden>Inspect: tap two things that don't agree.</div>
+    <div class="docs"></div>
+    <div class="desk-tools"><button class="btn small lineup" type="button" hidden>Line up</button></div>
+  </section>
+</div>
+<footer class="actions">
+  ${d.layout==='solo'?`<div class="tools"><button class="act act-inspect" type="button">Inspect<kbd>I</kbd></button><button class="act act-book" type="button">Rules</button><button class="act act-uv" type="button" hidden>UV<kbd>U</kbd></button></div>`:''}
+  <div class="stamps">
+    <button class="act deny" type="button">Deny<kbd>${d.keyLabel.deny}</kbd></button>
+    <button class="act detain" type="button">Detain<kbd>${d.keyLabel.detain}</kbd></button>
+    <button class="act approve" type="button">Approve<kbd>${d.keyLabel.approve}</kbd></button>
+  </div>
+</footer>
+<div class="stamp" hidden></div>
+<div class="toast" role="status" hidden></div>`;
+
+const KEYS={solo:{approve:'a',deny:'d',detain:'x'},p1:{approve:'a',deny:'d',detain:'x'},p2:{approve:'arrowright',deny:'arrowleft',detain:'arrowdown'}};
+const KEYLABEL={solo:{approve:'A',deny:'D',detain:'X'},p1:{approve:'A',deny:'D',detain:'X'},p2:{approve:'→',deny:'←',detain:'↓'}};
+
+class Desk{
+  constructor(o){
+    Object.assign(this,{mode:o.mode,c:o.c,r:BD.rng(o.seed>>>0),layout:o.layout||'solo',name:o.name||'',count:o.count||0,queue:o.queue||null,
+      onEnd:o.onEnd||(()=>{}),online:!!o.online,keys:KEYS[o.keys||'solo'],keyLabel:KEYLABEL[o.keys||'solo'],
+      t:null,score:0,streak:0,cites:0,correct:0,processed:0,bonus:0,time:0,elapsed:0,inspect:false,sel:[],busy:true,done:false,started:false,
+      luckUsed:false,idx:0,hooks:{},touched:[],z:10,uv:false,vipDone:false,maxMistakes:3});
+    if(this.mode==='arcade')this.time=(this.c.event==='rush'?120:180)+(SV.upgrades.thermos?20:0);
+    if(this.mode==='endless'&&SV.upgrades.charm)this.maxMistakes=4;
+    const el=this.el=document.createElement('div');el.className='desk-root '+this.layout;el.innerHTML=DESK_HTML(this);
+    const on=(sel,fn)=>{const b=this.q(sel);if(b)b.addEventListener('click',fn);};
+    on('.approve',()=>this.decide('approve'));on('.deny',()=>this.decide('deny'));on('.detain',()=>this.decide('detain'));
+    on('.act-inspect',()=>this.setInspect(!this.inspect));
+    on('.act-book',()=>$('book').classList.contains('open')?closeBook():openBook());
+    on('.act-uv',()=>this.setUV(!this.uv));
+    on('.btn-pause',()=>pause());
+    on('.ask-btn',()=>{const m=this.q('.ask-menu');m.hidden=!m.hidden;});
+    on('.lineup',()=>this.lineUp());
+    el.addEventListener('click',e=>{const k=e.target.closest('[data-key]');if(k&&el.contains(k))this.pick(k.dataset.key,k);});
+    this.bindDrag();
+  }
+  q(s){return this.el.querySelector(s);}
+  mult(){return Math.min(4,1+Math.floor(this.streak/3));}
+  start(){this.started=true;this.busy=false;this.hud();this.next();}
+  isOver(){
+    if(this.mode==='arcade')return this.time<=0;
+    if(this.mode==='endless')return this.cites>=this.maxMistakes;
+    if(this.mode==='race')return this.processed>=this.count;
+    return this.idx>=this.queue.length;
+  }
+  next(){
+    this.sel=[];this.hl();
+    if(this.isOver())return this.finish();
+    let t;const c=this.c;
+    if(this.mode==='tutorial'){t=this.queue[this.idx++](this);}
+    else if(this.mode==='story'){
+      const F=SV.story.flags;let spec=this.queue[this.idx++];if(spec&&spec.skip&&spec.skip(F))spec=null;
+      if(spec){t=BD.makeTraveler(c,this.r,{p:0,name:spec.name,country:spec.country,purpose:spec.purpose});
+        if(spec.mutate)spec.mutate(t,c,this.r);BD.finalize(t,c);t.say=typeof spec.say==='function'?spec.say(F):spec.say;t.spec=spec;}
+      else t=BD.makeTraveler(c,this.r,{p:Math.min(.5,.3+c.day*.02)});
+    }else{
+      if(this.mode==='endless'&&this.processed>0&&this.processed%15===0){
+        c.banned=BD.FOREIGN[Math.floor(Math.random()*BD.FOREIGN.length)];c.event=Math.random()<.5?BD.EVENTS[Math.floor(Math.random()*4)]:null;
+        renderBook(c);this.applyEvent();this.toast('New bulletin: '+c.banned+' is closed'+(c.event?'. '+EVENT_INFO[c.event][0]+'!':'.'),'info');}
+      const p=this.mode==='endless'?Math.min(.6,.35+this.processed*.01):Math.min(.5,.3+Math.min(c.day,14)*.015);
+      t=BD.makeTraveler(c,this.r,{p,subtle:this.mode==='endless'&&this.processed>20});
+    }
+    if(c.event==='vip'&&!this.vipDone&&this.processed>=c.vipAt&&this.mode!=='tutorial'){
+      this.vipDone=true;if(!t.issues.length){BD.PLANT.expiry(t,c,this.r);BD.finalize(t,c);}
+      t.vip=true;t.say='Do you know who I am? Stamp it and be quick about it.';}
+    t.flagged=[];t.asked={};this.t=t;this.busy=false;this.renderTraveler();this.hud();
+    if(t.spec&&t.spec.choice){const ch=t.spec.choice;this.busy=true;
+      setTimeout(()=>{PAUSED=true;
+        overlay(`<div class="speaker">${esc(t.name)}</div><p class="line">${esc(ch.text)}</p><div class="choices">${ch.options.map((o,k)=>`<button class="btn${k?'':' primary'}" type="button" data-k="${k}">${esc(o.label)}</button>`).join('')}</div>`);
+        $('overlay-card').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{ch.options[+b.dataset.k].fn(SV.story.flags,this);persist();closeOverlay();PAUSED=false;this.busy=false;this.hud();});
+      },600);}
+    this.hooks.onTraveler&&this.hooks.onTraveler(t);
+  }
+  applyEvent(){
+    const ev=this.c.event,chip=this.q('.hud-event');chip.hidden=!ev;if(ev)chip.textContent=EVENT_INFO[ev][0];
+    this.q('.desk').classList.toggle('dark',ev==='power'&&!this.uv);
+  }
+  renderTraveler(){
+    const t=this.t,d=t.docs,p=d.passport,c=this.c,R=id=>c.rules.has(id);
+    const face=this.q('.face-btn');face.innerHTML=faceSVG(t.face);face.classList.remove('arrive');void face.offsetWidth;face.classList.add('arrive');
+    this.q('.who').textContent=this.mode==='story'?`Traveler ${this.idx} of ${this.queue.length}`:this.mode==='race'?`Traveler ${this.processed+1} of ${this.count}`:this.mode==='tutorial'?`Training traveler ${this.idx} of 3`:`Traveler ${this.processed+1}`;
+    this.q('.speech').textContent=t.say;
+    this.q('.purpose').textContent='Purpose: '+NAMES[t.purpose];
+    const hc=this.q('.height');hc.hidden=!R('height');hc.textContent=`Height chart: ${t.height} cm`;
+    const am=this.q('.ask-menu');if(am){am.hidden=true;this.q('.transcript').innerHTML='';
+      const qs=[['purpose','What brings you here?'],['stay','How long are you staying?'],['where','Where will you stay?']];if(R('fingerprint'))qs.push(['print','Fingerprint, please.']);
+      am.innerHTML=qs.map(([k,txt])=>`<button class="btn small" type="button" data-q="${k}">${txt}</button>`).join('');
+      am.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>this.ask(b.dataset.q,b));}
+    const cl=this.q('.checklist');cl.hidden=!SV.upgrades.checklist||this.mode==='race';
+    if(!cl.hidden)cl.innerHTML='<b>Check:</b> '+applicable(t,c).join(' · ');
+    const diplo=p.diplomat,genuine=BD.COUNTRIES[p.country].includes(p.city);
+    let h=`<article class="doc passport${genuine?' genuine':''}" style="--cover:${diplo?'#a8842c':COVER[p.country]}"><header><span>${esc(p.country.toUpperCase())}</span><b>${diplo?'Diplomatic passport':'Passport'}</b></header>
+<div class="pp-body"><button type="button" class="f photo" data-key="passport.photo" aria-label="Passport photo">${faceSVG(p.face)}</button>
+<div class="fields">${F('passport.name','Name',p.name)}${F('passport.dob','Born',BD.fmtDate(p.dob))}${F('passport.country','Country',p.country)}${F('passport.city','Issued in',p.city)}${F('passport.number','Passport no.',p.number)}${F('passport.expiry','Expires',BD.fmtDate(p.expiry))}${R('height')?F('passport.height','Height',p.height+' cm'):''}</div></div></article>`;
+    if(d.ticket)h+=`<article class="doc ticket"><header><span>VELDMARK</span><b>Entry ticket</b></header><div class="body">${F('ticket.name','Name',d.ticket.name)}${F('ticket.date','Valid on',BD.fmtDate(d.ticket.date))}${R('stay')?F('ticket.stay','Length of stay',d.ticket.stay+' days'):''}</div></article>`;
+    if(d.work)h+=`<article class="doc work"><header><span>MINISTRY OF LABOR</span><b>Work pass</b></header><div class="body work-grid"><div>${F('work.name','Name',d.work.name)}${F('work.number','Passport no.',d.work.number)}${F('work.until','Valid until',BD.fmtDate(d.work.until))}</div>
+<div class="work-side"><button type="button" class="f seal-btn${BD.SEALS.includes(d.work.seal)?'':' fake'}" data-key="work.seal" aria-label="Seal">${sealSVG(d.work.seal)}</button>${R('fingerprint')?`<button type="button" class="f print-btn" data-key="work.print" aria-label="Fingerprint on pass">${printSVG(d.work.print)}</button>`:''}</div></div></article>`;
+    if(d.vaccine)h+=`<article class="doc vaccine"><header><span>HEALTH OFFICE</span><b>Grayfever vaccine</b></header><div class="body">${F('vaccine.name','Name',d.vaccine.name)}${F('vaccine.number','Passport no.',d.vaccine.number)}${F('vaccine.date','Dose given',BD.fmtDate(d.vaccine.date))}</div></article>`;
+    if(d.id)h+=`<article class="doc idcard"><header><span>VELDMARK</span><b>Citizen ID</b></header><div class="body">${F('id.name','Name',d.id.name)}${F('id.dob','Born',BD.fmtDate(d.id.dob))}${F('id.district','District',d.id.district)}</div></article>`;
+    if(d.transit)h+=`<article class="doc transit"><header><span>VELDMARK RAIL</span><b>Transit slip</b></header><div class="body">${F('transit.name','Name',d.transit.name)}${F('transit.until','Must leave by',BD.fmtDate(d.transit.until))}</div></article>`;
+    if(d.letter)h+=`<article class="doc letter${d.letter.country!==p.country?' fake':''}"><header><span>EMBASSY</span><b>Accreditation</b></header><div class="body">${F('letter.name','Diplomat',d.letter.name)}${F('letter.country','Embassy of',d.letter.country)}</div></article>`;
+    if(d.consent)h+=`<article class="doc consent"><header><span>FAMILY OFFICE</span><b>Guardian consent</b></header><div class="body">${F('consent.name','Traveler',d.consent.name)}${F('consent.guardian','Guardian',d.consent.guardian)}</div></article>`;
+    const docs=this.q('.docs');docs.innerHTML=h;docs.scrollLeft=0;this.q('.desk').scrollTop=0;this.touched=[];
+    this.layoutDocs();this.applyEvent();
+  }
+  freeMode(){return this.layout==='solo'&&WIDE();}
+  layoutDocs(){
+    const docs=this.q('.docs'),free=this.freeMode(),lu=this.q('.lineup');docs.classList.toggle('free',free);
+    const list=[...docs.querySelectorAll('.doc')];lu.hidden=!free||list.length<2;
+    if(!free){list.forEach(x=>{x.style.left=x.style.top=x.style.zIndex='';});docs.style.height='';return;}
+    const W=docs.clientWidth;let bottom=0;
+    list.forEach((x,i)=>{const cols=Math.max(1,Math.floor((W+12)/302));const col=i%cols,row=Math.floor(i/cols);
+      x.style.left=Math.min(col*302+row*24,Math.max(0,W-x.offsetWidth))+'px';x.style.top=(row*60+col*18)+'px';x.style.zIndex=++this.z;
+      bottom=Math.max(bottom,x.offsetTop+x.offsetHeight);});
+    docs.style.height=Math.max(bottom+20,this.q('.desk').clientHeight-24)+'px';
+  }
+  bindDrag(){
+    const docs=this.q('.docs');
+    docs.addEventListener('pointerdown',e=>{
+      const doc=e.target.closest('.doc');if(!doc)return;
+      if(this.c&&this.c.event==='power'&&!this.uv){doc.classList.add('lit');clearTimeout(doc._lit);doc._lit=setTimeout(()=>doc.classList.remove('lit'),4000);}
+      if(!docs.classList.contains('free'))return;
+      doc.style.zIndex=++this.z;this.touched=[doc,...this.touched.filter(x=>x!==doc)].slice(0,2);
+      const h=e.target.closest('header');if(!h)return;e.preventDefault();
+      const sx=e.clientX,sy=e.clientY,ox=doc.offsetLeft,oy=doc.offsetTop;try{h.setPointerCapture(e.pointerId);}catch(err){}
+      const mv=ev=>{const W=docs.clientWidth-doc.offsetWidth;doc.style.left=Math.max(0,Math.min(W,ox+ev.clientX-sx))+'px';doc.style.top=Math.max(0,oy+ev.clientY-sy)+'px';
+        const b=doc.offsetTop+doc.offsetHeight+20;if(b>docs.offsetHeight)docs.style.height=b+'px';};
+      const up=()=>{h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',up);h.removeEventListener('pointercancel',up);};
+      h.addEventListener('pointermove',mv);h.addEventListener('pointerup',up);h.addEventListener('pointercancel',up);
+    });
+  }
+  lineUp(){
+    const all=[...this.q('.docs').querySelectorAll('.doc')];const two=[...this.touched];
+    for(const x of all){if(two.length>=2)break;if(!two.includes(x))two.push(x);}
+    two.forEach((x,i)=>{x.style.left=(i*302)+'px';x.style.top='0px';x.style.zIndex=++this.z;});
+    this.q('.desk').scrollTop=0;
+  }
+  ask(k,btn){
+    const t=this.t;if(!t||t.asked[k])return;t.asked[k]=true;btn.disabled=true;
+    const dodge=t.crime&&Math.random()<.35, tr=this.q('.transcript'),q=btn.textContent;let a;
+    if(k==='purpose')a=`<p class="a">${esc(dodge?'Why do you ask?':t.say)}</p>`;
+    else if(k==='stay')a=t.answers.stay!=null?`<button type="button" class="f a" data-key="answer.stay">“${t.answers.stay} days.”</button>`:`<p class="a">${t.docs.passport.diplomat?'As long as my posting lasts.':t.purpose==='return'?'I live here.':'Not long.'}</p>`;
+    else if(k==='where')a=`<p class="a">${esc(dodge?'Here and there.':'A guesthouse in '+['Brask','Ollen','Vey'][t.height%3]+'.')}</p>`;
+    else a=`<button type="button" class="f print-card" data-key="booth.print" aria-label="Traveler's fingerprint">${printSVG(t.print)}</button>`;
+    tr.insertAdjacentHTML('beforeend',`<div class="q">You: ${esc(q)}</div>${a}`);
+    if(this.inspect)tr.querySelectorAll('.f').forEach(x=>x.classList.toggle('sel',this.sel.includes(x.dataset.key)));
+  }
+  setUV(on){this.uv=on;this.q('.act-uv').classList.toggle('on',on);this.q('.desk').classList.toggle('uv',on);this.applyEvent();}
+  setInspect(on){
+    this.inspect=on;this.sel=[];this.el.classList.toggle('inspecting',on);$('book').classList.toggle('inspecting',on&&this.layout==='solo');
+    const b=this.q('.act-inspect');if(b)b.classList.toggle('on',on);this.q('.inspect-bar').hidden=!on;this.hl();
+    if(on)this.hooks.onInspect&&this.hooks.onInspect();
+  }
+  hl(){const s=this.sel;this.el.querySelectorAll('[data-key]').forEach(x=>x.classList.toggle('sel',s.includes(x.dataset.key)));
+    if(this.layout==='solo')$('book').querySelectorAll('[data-key]').forEach(x=>x.classList.toggle('sel',s.includes(x.dataset.key)));}
+  pick(key,el){
+    if(!this.inspect||this.busy||!this.t)return;
+    const doc=el&&el.closest('.doc');if(doc&&this.c.event==='power'&&!this.uv&&!doc.classList.contains('lit'))return;
+    const i=this.sel.indexOf(key);if(i>=0)this.sel.splice(i,1);else this.sel.push(key);this.hl();
+    this.hooks.onPick&&this.hooks.onPick(key);
+    if(this.sel.length<2)return;
+    const k=this.sel.slice().sort().join('|');
+    const iss=this.t.issues.find(x=>x.fields.slice().sort().join('|')===k);
+    if(iss){if(!this.t.flagged.includes(k))this.t.flagged.push(k);this.q('.speech').textContent=iss.say;this.toast('Discrepancy: '+iss.text,'info');sound('ding');this.hooks.onFlag&&this.hooks.onFlag();}
+    else{this.q('.speech').textContent='I don’t see a problem there.';sound('soft');}
+    setTimeout(()=>{this.sel=[];this.hl();},700);
+  }
+  toast(msg,kind){const el=this.q('.toast');el.textContent=msg;el.className='toast '+kind;el.hidden=false;clearTimeout(this._tt);this._tt=setTimeout(()=>el.hidden=true,1900);}
+  decide(kind){
+    if(this.busy||!this.t||this.done||PAUSED||!$('overlay').hidden)return;
+    this.busy=true;this.setInspect(false);if(this.layout==='solo')closeBook();
+    const t=this.t,valid=!t.issues.length,story=this.mode==='story',ev=this.c.event;
+    let ok,msg;
+    if(kind==='approve'){ok=valid;msg=ok?'Correct. Welcome to Veldmark.':'Citation: '+t.issues[0].text;}
+    else if(kind==='deny'){ok=!valid;msg=ok?'Correct. '+t.issues[0].text+(t.crime?' (Detain would have earned more.)':''):'Citation: their papers were in order.';}
+    else{ok=t.crime;msg=ok?'Detained. '+t.issues.find(x=>x.crime).text:valid?'Citation: you detained someone with good papers.':'Citation: wrongful detention. '+t.issues[0].text+' That’s a deny, not a crime.';}
+    const st=this.q('.stamp');st.textContent={approve:'Entry granted',deny:'Entry denied',detain:'Detained'}[kind];st.className='stamp '+{approve:'ok',deny:'no',detain:'det'}[kind];st.hidden=false;
+    sound('stamp');setTimeout(()=>{st.hidden=true;},450);
+    if(t.spec&&t.spec.decide)t.spec.decide(kind,SV.story.flags);
+    this.processed++;
+    if(!ok&&SV.upgrades.charm&&!this.luckUsed&&(this.mode==='arcade'||this.mode==='story')){this.luckUsed=true;ok=null;msg='Lucky charm: that citation is forgiven.';}
+    const evm=ev==='inspector'?2:ev==='rush'?1.5:1;
+    if(ok){this.correct++;this.streak++;
+      const flags=kind==='approve'?0:t.flagged.length,det=kind==='detain'?1:0;this.bonus+=flags+det;
+      let gain=story?5+flags*2+det*15:(10+det*25)*this.mult()+flags*5;
+      if(t.vip){gain+=30;msg='Correct. Brel backs you up: +30.';}
+      this.score+=Math.round(gain*(story&&ev!=='inspector'?1:evm));
+      setTimeout(()=>{sound('good');this.toast(msg,'good');},150);
+    }else if(ok===false){this.cites++;this.streak=0;this.score-=(story?5:10)*(ev==='inspector'?2:1);
+      setTimeout(()=>{sound('bad');this.toast(msg,'bad');},150);}
+    else setTimeout(()=>this.toast(msg,'info'),150);
+    this.hud();persist();
+    this.hooks.onDecide&&this.hooks.onDecide(kind,ok);
+    let gap=SV.upgrades.quick&&this.mode!=='race'?450:800;if(ev==='rush')gap/=2;
+    if(this.mode==='arcade')gap*=Math.max(.6,1-this.processed*.01);
+    if(this.mode==='tutorial')gap=1400;
+    setTimeout(()=>this.next(),300+gap);
+  }
+  raceTime(){return Math.max(0,this.elapsed+10*this.cites-2*this.bonus);}
+  tick(dt){
+    if(!this.started||this.done)return;
+    this.elapsed+=dt;
+    if(this.mode==='arcade'){this.time-=dt;if(this.time<=0&&!this.busy){this.busy=true;this.toast('Shift over','info');setTimeout(()=>this.finish(),700);}}
+    this.hud();
+  }
+  hud(){
+    const m=this.mode,mid=this.q('.hud-mid');
+    this.q('.hud-day').textContent=m==='endless'?'Endless':m==='tutorial'?'Training':m==='race'?(this.name||'Race'):(m==='story'?'Story · ':'')+'Day '+this.c.day;
+    this.q('.hud-date').textContent=BD.fmtDate(this.c.today);
+    mid.classList.remove('warn');
+    const sc=this.q('.sc'),mu=this.q('.mult');
+    if(m==='race'){mid.textContent=`${Math.min(this.processed,this.count)}/${this.count} · ${fmtTime(this.elapsed)}`;sc.textContent=this.cites?'+'+this.cites*10+'s':'';mu.textContent='';return;}
+    sc.textContent=m==='story'?this.score+' cr':m==='tutorial'?'':this.score;
+    mu.textContent=m!=='story'&&m!=='tutorial'&&this.mult()>1?'×'+this.mult():'';
+    if(m==='arcade'){const s=Math.max(0,Math.ceil(this.time));mid.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');if(s<=20)mid.classList.add('warn');}
+    else if(m==='endless'){mid.textContent='Mistakes '+this.cites+'/'+this.maxMistakes;if(this.cites===this.maxMistakes-1)mid.classList.add('warn');}
+    else if(m==='story')mid.textContent='Citations '+this.cites;
+    else mid.textContent='';
+  }
+  finish(){if(this.done)return;this.done=true;this.busy=true;this.setInspect(false);this.onEnd(this);}
+}
+
+/* ================= mounting desks ================= */
+function teardown(){DESKS=[];document.body.appendChild($('book'));$('book').hidden=true;closeBook();$('game').innerHTML='';PAUSED=false;}
+function mountSolo(desk,newDay){
+  teardown();const g=$('game');g.className='screen solo';g.appendChild(desk.el);
+  desk.q('.main').appendChild($('book'));$('book').hidden=false;renderBook(desk.c,newDay);
+  if(!SV.upgrades.uv){const u=desk.q('.act-uv');if(u)u.hidden=true;}else desk.q('.act-uv').hidden=false;
+  DESKS=[desk];show('game');desk.hud();desk.applyEvent();
+}
+function mountSplit(a,b){
+  teardown();const g=$('game');g.className='screen split';g.append(a.el,$('book'),b.el);$('book').hidden=false;renderBook(a.c);
+  DESKS=[a,b];show('game');a.hud();b.hud();a.applyEvent();b.applyEvent();
+}
+window.addEventListener('resize',()=>{for(const d of DESKS)if(d.t)d.layoutDocs();if(Coach.steps)Coach.show();});
+
+/* ================= coach marks + tutorial ================= */
+const Coach={steps:null,i:0,done:null,
+  run(steps,done){this.steps=steps;this.i=0;this.done=done;$('coach').hidden=false;this.show();},
+  show(){
+    if(!this.steps)return;
+    if(this.i>=this.steps.length)return this.end();
+    const s=this.steps[this.i];let el=s.target?s.target():null;if(el&&!el.offsetParent&&el!==$('book'))el=null;
+    const spot=$('coach-spot'),b=$('coach-bubble');
+    b.innerHTML=`<p>${s.text}</p>${s.wait?`<span class="wait">${s.waitText||'Waiting for you…'}</span>`:''}<div class="row">${s.wait?'':`<button class="btn small primary" id="coach-next" type="button">${this.i===this.steps.length-1?'Done':'Next'}</button>`}<button class="btn small" id="coach-skip" type="button">Skip tutorial</button></div>`;
+    if(this.steps.length===1&&!s.wait)$('coach-skip').remove();
+    const nx=$('coach-next');if(nx)nx.onclick=()=>{this.i++;this.show();};
+    const sk=$('coach-skip');if(sk)sk.onclick=()=>this.end(true);
+    if(el){try{el.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}const r=el.getBoundingClientRect();
+      Object.assign(spot.style,{display:'block',left:r.left-6+'px',top:r.top-6+'px',width:r.width+12+'px',height:r.height+12+'px'});
+      const bh=b.offsetHeight,bw=b.offsetWidth;let top=r.bottom+14;if(top+bh>innerHeight-10)top=Math.max(10,r.top-bh-14);
+      b.style.top=top+'px';b.style.left=Math.max(10,Math.min(innerWidth-bw-10,r.left+r.width/2-bw/2))+'px';}
+    else{spot.style.display='none';b.style.top=Math.max(10,innerHeight/2-b.offsetHeight/2)+'px';b.style.left=Math.max(10,innerWidth/2-b.offsetWidth/2)+'px';}
+  },
+  event(name){
+    if(!this.steps)return;
+    if(name==='decide'){let j=this.i;while(j<this.steps.length&&this.steps[j].wait!=='decide')j++;if(j>=this.steps.length)return;this.i=j+1;$('coach-spot').style.display='none';$('coach-bubble').style.top='-999px';setTimeout(()=>this.show(),1900);return;}
+    if(this.steps[this.i].wait===name){this.i++;setTimeout(()=>this.show(),120);}
+  },
+  end(skipped){$('coach').hidden=true;this.steps=null;const d=this.done;this.done=null;d&&d(skipped);}
+};
+function runTutorial(after){
+  const c=BD.makeDay(1,7,{event:null});
+  const mk=(d,country,plant)=>{const t=BD.makeTraveler(d.c,d.r,{p:0,country,purpose:'visit'});if(plant)BD.PLANT[plant](t,d.c,d.r);BD.finalize(t,d.c);
+    t.say=plant==='photo'?'Evening. Just visiting.':plant?'Please be quick, my train leaves soon.':'Hello! Visiting my cousin.';return t;};
+  const D=new Desk({mode:'tutorial',c,seed:11,queue:[d=>mk(d,'Corvel'),d=>mk(d,'Ostrand','expiry'),d=>mk(d,'Lumeno','photo')],
+    onEnd:()=>{}});
+  mountSolo(D,1);
+  D.hooks={onDecide:()=>Coach.event('decide'),onInspect:()=>Coach.event('inspect'),onPick:()=>Coach.event('pick'),onFlag:()=>Coach.event('flag')};
+  const q=s=>()=>D.q(s);
+  const bookT=()=>WIDE()?$('book'):D.q('.act-book');
+  D.start();
+  setTimeout(()=>Coach.run([
+    {target:q('.face-btn'),text:'This is the traveler. Every check starts with their face.'},
+    {target:q('[data-key="passport.photo"]'),text:'Compare it with the passport photo. Here they match.'},
+    {target:q('[data-key="passport.expiry"]'),text:'Check the passport’s expiry date…'},
+    {target:q('[data-key="desk.date"]'),text:'…against today’s date, up here. This passport is still valid.'},
+    {target:bookT,text:'The rulebook lists today’s rules. New rules arrive most days, so read it every morning.'},
+    {target:q('.approve'),text:'Everything is in order. Press <b>Approve</b>.',wait:'decide'},
+    {target:q('[data-key="passport.expiry"]'),text:'Look at this expiry date. It’s before today. Expired papers aren’t a crime, so press <b>Deny</b>.',wait:'decide'},
+    {target:q('.act-inspect'),text:'Something is off with this one. Turn on <b>Inspect</b>.',wait:'inspect'},
+    {target:q('[data-key="passport.photo"]'),text:'Tap the passport photo…',wait:'pick'},
+    {target:q('.face-btn'),text:'…then tap the traveler’s face.',wait:'flag'},
+    {target:q('.detain'),text:'A different face means an impostor. Crimes like fake faces, fake seals and forged papers get <b>Detain</b>.',wait:'decide'},
+    {target:null,text:'That’s the job: <b>Approve</b> good papers, <b>Deny</b> bad ones, <b>Detain</b> criminals. Later rules make you <b>Ask</b> travelers questions. Good luck, officer.'}
+  ],()=>{SV.tutorialDone=true;SV.tips.expiry=SV.tips.photo=1;persist();teardown();after?after():renderMenu();}),500);
+}
+function ruleTip(desk,day,go){
+  const r=BD.RULES.find(x=>x.day===day&&!SV.tips[x.id]);
+  if(!r||day<2)return go();
+  Coach.run([{target:()=>WIDE()?$('book').querySelector(`[data-rule="${r.id}"]`):desk.q('.act-book'),text:`<b>New rule today.</b> ${r.text}`}],()=>{BD.RULES.filter(x=>x.day===day).forEach(x=>SV.tips[x.id]=1);persist();go();});
+}
+function needTutorial(go){if(!SV.tutorialDone){runTutorial(go);return true;}return false;}
+
+/* ================= solo modes ================= */
+function eventIntro(c,go){
+  if(!c.event)return go();
+  const [title,text]=EVENT_INFO[c.event];
+  overlay(`<div class="speaker">Today’s event</div><h2>${title}</h2><p class="line">${text}</p><button class="btn primary" id="ov-go" type="button">Start shift</button>`);
+  $('ov-go').onclick=()=>{closeOverlay();go();};
+}
+function startArcade(day,over){
+  if(needTutorial(()=>startArcade(day,over)))return;
+  const c=BD.makeDay(day,rand32(),over);
+  const D=new Desk({mode:'arcade',c,seed:rand32(),onEnd:endArcade});
+  mountSolo(D,day<=14?day:0);
+  eventIntro(c,()=>ruleTip(D,day,()=>D.start()));
+}
+function startEndless(){
+  if(needTutorial(startEndless))return;
+  const c=BD.makeDay(99,rand32(),{today:15});
+  const D=new Desk({mode:'endless',c,seed:rand32(),onEnd:endEndless});
+  mountSolo(D,0);eventIntro(c,()=>D.start());
+}
+function storyDay(){
+  const st=SV.story,day=st.day;
+  const c=BD.makeDay(day,(st.seed+day*101)>>>0,STORY.over[day]);
+  const sc=STORY.scripted[day]||[];const n=10+Math.floor(day/2)+sc.length;const q=new Array(n).fill(null);sc.forEach(s=>q[Math.min(s.at,n-1)]=s);
+  const begin=()=>{const D=new Desk({mode:'story',c,seed:(st.seed+day*7)>>>0,queue:q,onEnd:endStory});mountSolo(D,day);ruleTip(D,day,()=>D.start());};
+  runScene(STORY.intro[day]||[],st.flags,()=>{if(!needTutorial(begin))begin();},`Day ${day}`);
+}
+function runScene(lines,F,done,title){
+  lines=lines.slice();let i=0;
+  const step=()=>{
+    if(i>=lines.length){closeOverlay();done();return;}
+    const L=lines[i++];
+    if(L.choice){
+      overlay(`<div class="speaker">${esc(title||'')}</div><p class="line">${esc(L.choice)}</p><div class="choices">${L.options.map((o,k)=>`<button class="btn${k?'':' primary'}" type="button" data-k="${k}">${esc(o.label)}</button>`).join('')}</div>`);
+      $('overlay-card').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const o=L.options[+b.dataset.k];o.fn(F);persist();lines.splice(i,0,...(o.reply||[]));step();});
+      return;}
+    overlay(`<div class="speaker">${esc(L[0])}</div><p class="line">${esc(L[1])}</p><button class="btn primary" id="ov-next" type="button">${i>=lines.length?'Start shift':'Continue'}</button>`);
+    $('ov-next').onclick=step;$('ov-next').focus();
+  };
+  step();
+}
+const statsHTML=(D,unit)=>`<div class="stats"><div class="stat"><b>${D.processed}</b><small>Processed</small></div><div class="stat"><b>${D.correct}</b><small>Correct</small></div><div class="stat"><b>${D.cites}</b><small>Citations</small></div><div class="stat"><b>${D.score}${unit||''}</b><small>${unit?'Pay':'Score'}</small></div></div>`;
+function earn(n){n=Math.max(0,Math.floor(n));SV.crowns+=n;persist();return n;}
+function endArcade(D){
+  const day=D.c.day,prev=SV.best[day],rec=prev==null||D.score>prev;if(rec)SV.best[day]=D.score;SV.arcadeMax=Math.max(SV.arcadeMax,day);
+  const got=earn(D.score/5);
+  overlay(`<h2>Shift over · Day ${day}</h2><p>${rec?'New best for this day.':'Best for this day: '+prev}. You earned <b style="color:var(--lamp)">${got} crowns</b>.</p>${statsHTML(D)}
+<div class="row"><button class="btn primary" id="o1" type="button">Day ${day+1}</button><button class="btn" id="o2" type="button">Replay day</button><button class="btn" id="o4" type="button">Booth shop</button><button class="btn" id="o3" type="button">Menu</button></div>`);
+  $('o1').onclick=()=>{closeOverlay();startArcade(day+1);};$('o2').onclick=()=>{closeOverlay();startArcade(day);};
+  $('o4').onclick=()=>openShop(()=>endArcadeAgain());$('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};
+  function endArcadeAgain(){overlay(`<h2>Day ${day} done</h2><div class="row"><button class="btn primary" id="o1" type="button">Day ${day+1}</button><button class="btn" id="o3" type="button">Menu</button></div>`);
+    $('o1').onclick=()=>{closeOverlay();startArcade(day+1);};$('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};}
+}
+function endEndless(D){
+  const rec=D.correct>SV.endless;if(rec)SV.endless=D.correct;const got=earn(D.correct*2);
+  overlay(`<h2>Out of chances</h2><p>${rec?'New best: '+D.correct+' correct decisions.':'Best: '+SV.endless+' correct decisions.'} You earned <b style="color:var(--lamp)">${got} crowns</b>.</p>${statsHTML(D)}
+<div class="row"><button class="btn primary" id="o1" type="button">Try again</button><button class="btn" id="o4" type="button">Booth shop</button><button class="btn" id="o3" type="button">Menu</button></div>`);
+  $('o1').onclick=()=>{closeOverlay();startEndless();};$('o4').onclick=()=>openShop(()=>{closeOverlay();teardown();renderMenu();});$('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};
+}
+function endStory(D){
+  const st=SV.story;st.pay+=D.score;st.cites+=D.cites;const day=st.day;const got=earn(D.score);
+  if(day>=10){
+    const [title,text]=storyEnding(st);SV.story=null;persist();
+    overlay(`<div class="speaker">Ending</div><h2>${esc(title)}</h2><p class="line">${esc(text)}</p><p>Total pay ${st.pay} cr · ${st.cites} citations over 10 days.</p><button class="btn primary" id="o3" type="button">Back to menu</button>`);
+    $('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};return;}
+  st.day=day+1;persist();
+  overlay(`<h2>End of day ${day}</h2><p>Record so far: ${st.cites} citations. Today’s pay of ${got} crowns goes to your wallet.</p>${statsHTML(D,' cr')}
+<div class="row"><button class="btn primary" id="o1" type="button">Day ${day+1}</button><button class="btn" id="o4" type="button">Booth shop</button><button class="btn" id="o3" type="button">Save and quit</button></div>`);
+  $('o1').onclick=()=>{closeOverlay();storyDay();};$('o4').onclick=()=>openShop(()=>{closeOverlay();storyDay();});$('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};
+}
+
+/* ================= shop ================= */
+function openShop(after){
+  const draw=()=>{
+    overlay(`<h2>Booth shop</h2><p>Wallet: <b style="color:var(--lamp)">${SV.crowns} crowns</b>. Earn crowns in every mode. Tools are yours for good.</p>
+<div class="list">${SHOP.map(it=>{const own=SV.upgrades[it.id];return `<div class="shop-item"><div><b>${it.name}</b><small>${it.text}</small></div>${own?'<span class="small-note">Owned</span>':`<button class="btn small${SV.crowns>=it.price?' primary':''}" type="button" data-buy="${it.id}" ${SV.crowns>=it.price?'':'disabled'}>${it.price} cr</button>`}</div>`;}).join('')}</div>
+<button class="btn" id="shop-close" type="button">Done</button>`);
+    $('overlay-card').querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{const it=SHOP.find(x=>x.id===b.dataset.buy);if(SV.crowns<it.price)return;SV.crowns-=it.price;SV.upgrades[it.id]=true;persist();sound('ding');draw();});
+    $('shop-close').onclick=()=>{closeOverlay();after?after():renderMenu();};
+  };
+  draw();
+}
+
+/* ================= races ================= */
+function countdown(go){
+  let n=3;const tick=()=>{if(n===0){overlay('<div class="countdown">GO</div>');sound('go');setTimeout(()=>{closeOverlay();go();},500);return;}
+    overlay(`<div class="countdown">${n}</div>`);sound('tick');n--;setTimeout(tick,750);};tick();
+}
+const RACE_DAYS=[[3,'Easy'],[6,'Medium'],[10,'Hard'],[14,'Expert']];
+function raceResults(rows,again){
+  rows.sort((a,b)=>a.time-b.time);
+  overlay(`<h2>Race results</h2><div class="list">${rows.map((r,i)=>`<div class="item"><span class="place">${i+1}</span><div><b>${esc(r.name)}</b><small>${r.cites} mistake${r.cites===1?'':'s'} (+${r.cites*10}s) · ${r.bonus} bonus (−${r.bonus*2}s)</small></div><b>${fmtTime(r.time)}</b></div>`).join('')}</div>
+<div class="row"><button class="btn primary" id="o1" type="button">Rematch</button><button class="btn" id="o3" type="button">Menu</button></div>`);
+  $('o1').onclick=()=>{closeOverlay();again();};$('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};
+}
+function localRaceSetup(){
+  let cfg=Object.assign({players:2,names:['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6'],count:12,day:6},SV.raceCfg||{});
+  const draw=()=>{
+    const split=cfg.players===2&&WIDE();
+    overlay(`<h2>Same-device race</h2>
+<label>Players</label><div class="chips">${[2,3,4,5,6].map(n=>`<button class="chip-day${cfg.players===n?' on':''}" type="button" data-p="${n}"><b>${n}</b></button>`).join('')}</div>
+<div class="list">${Array.from({length:cfg.players},(_,i)=>`<label>Player ${i+1}<input id="rn${i}" maxlength="16" value="${esc(cfg.names[i])}"></label>`).join('')}</div>
+<label>Travelers</label><div class="chips">${[8,12,16,20].map(n=>`<button class="chip-day${cfg.count===n?' on':''}" type="button" data-c="${n}"><b>${n}</b></button>`).join('')}</div>
+<label>Difficulty</label><div class="chips">${RACE_DAYS.map(([d,l])=>`<button class="chip-day${cfg.day===d?' on':''}" type="button" data-d="${d}"><b>${l}</b><small>day ${d} rules</small></button>`).join('')}</div>
+<p>${split?'Split screen: Player 1 uses A / D / X, Player 2 uses → / ← / ↓, or tap your own buttons.':'Pass and play: each player races the same travelers in turn, then hands over the device.'}</p>
+<div class="row"><button class="btn primary" id="race-go" type="button">Start race</button><button class="btn" id="race-x" type="button">Cancel</button></div>`);
+    const save=()=>{for(let i=0;i<cfg.players;i++){const v=$('rn'+i).value.trim();cfg.names[i]=v||('Player '+(i+1));}};
+    const card=$('overlay-card');
+    card.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{save();cfg.players=+b.dataset.p;draw();});
+    card.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{save();cfg.count=+b.dataset.c;draw();});
+    card.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{save();cfg.day=+b.dataset.d;draw();});
+    $('race-x').onclick=()=>{closeOverlay();renderMenu();};
+    $('race-go').onclick=()=>{save();SV.raceCfg=cfg;persist();closeOverlay();split?splitRace(cfg):passRace(cfg);};
+  };
+  draw();
+}
+function splitRace(cfg){
+  const seed=rand32(),rows=[];
+  const end=D=>{rows.push({name:D.name,time:D.raceTime(),cites:D.cites,bonus:D.bonus});
+    D.el.insertAdjacentHTML('beforeend',`<div class="finish-panel"><div>Finished<b>${fmtTime(D.raceTime())}</b>${rows.length<2?'Waiting for the other player…':''}</div></div>`);
+    if(rows.length===2)setTimeout(()=>raceResults(rows,()=>splitRace(cfg)),900);};
+  const mk=(i,keys)=>new Desk({mode:'race',layout:'split',keys,c:BD.makeDay(cfg.day,seed),seed:seed+1,count:cfg.count,name:cfg.names[i],onEnd:end});
+  const a=mk(0,'p1'),b=mk(1,'p2');mountSplit(a,b);countdown(()=>{a.start();b.start();});
+}
+function passRace(cfg){
+  const seed=rand32(),rows=[];let i=0;
+  const turn=()=>{
+    if(i>=cfg.players)return raceResults(rows,()=>passRace(cfg));
+    const name=cfg.names[i];
+    teardown();show('menu');
+    overlay(`<div class="speaker">Player ${i+1} of ${cfg.players}</div><h2>Hand the device to ${esc(name)}</h2><p>${cfg.count} travelers, the same for everyone. Every mistake adds 10 seconds.</p><button class="btn primary" id="o1" type="button">I’m ${esc(name)}, start</button>`);
+    $('o1').onclick=()=>{closeOverlay();
+      const D=new Desk({mode:'race',c:BD.makeDay(cfg.day,seed),seed:seed+1,count:cfg.count,name,onEnd:d=>{rows.push({name,time:d.raceTime(),cites:d.cites,bonus:d.bonus});i++;
+        overlay(`<h2>${esc(name)}: ${fmtTime(d.raceTime())}</h2><p>${d.cites} mistakes. Results come after the last player.</p><button class="btn primary" id="o1" type="button">Next</button>`);$('o1').onclick=()=>{closeOverlay();turn();};}});
+      mountSolo(D,0);countdown(()=>D.start());};
+  };
+  turn();
+}
+
+/* ----- online race over the artifact's `room` capability ----- */
+let ROOM=undefined;const roomReady=(async()=>{try{ROOM=window.claude&&window.claude.use?await window.claude.use('room'):null;}catch(e){ROOM=null;}return ROOM;})();
+let NET=null;
+function onlineUnavailable(){
+  overlay(`<h2>Online race</h2>${ON_PAGES||!window.claude?`<p>Online races run in the Claude version of Border Desk, which keeps everyone in sync. Open it here and add it to your Home Screen: <a href="${ARTIFACT_URL}" target="_blank" rel="noopener">${ARTIFACT_URL}</a>. The owner has to share it with each player first.</p>`
+    :'<p>This view can’t join online races. You need to be signed in to Claude, and the artifact needs to be shared with you.</p>'}<p>You can still race on one device: split screen or pass and play.</p>
+<div class="row"><button class="btn primary" id="o1" type="button">Same-device race</button><button class="btn" id="o3" type="button">Back</button></div>`);
+  $('o1').onclick=()=>{closeOverlay();localRaceSetup();};$('o3').onclick=closeOverlay;
+}
+async function onlineStart(){
+  if(ROOM===undefined){overlay('<h2>Connecting…</h2>');await roomReady;closeOverlay();}
+  if(!ROOM)return onlineUnavailable();
+  overlay(`<h2>Online race</h2><label>Your name<input id="nick" maxlength="16" value="${esc(SV.nick)}"></label>
+<button class="btn primary" id="o-create" type="button">Create a race</button>
+<label>Or join with a code<div class="row"><input id="code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase;width:8em"><button class="btn" id="o-join" type="button">Join</button></div></label>
+<p id="o-err" hidden style="color:var(--deny)"></p><button class="btn" id="o3" type="button">Back</button>`);
+  const nick=()=>{SV.nick=($('nick').value.trim()||SV.nick).slice(0,16);persist();};
+  $('o-create').onclick=()=>{nick();const A='ABCDEFGHJKMNPQRSTUVWXYZ';let c='';for(let i=0;i<4;i++)c+=A[Math.floor(Math.random()*A.length)];joinRace(c,true);};
+  $('o-join').onclick=()=>{nick();const c=$('code').value.trim().toUpperCase();if(!/^[A-Z]{4}$/.test(c)){$('o-err').hidden=false;$('o-err').textContent='Enter the 4-letter code from the host.';return;}joinRace(c,false);};
+  $('o3').onclick=closeOverlay;
+}
+async function joinRace(code,host){
+  let R;try{R=await ROOM.join('race-'+code.toLowerCase());}catch(e){overlay(`<h2>Couldn’t join</h2><p>${esc(e&&e.message||'The race room didn’t answer.')} Try again in a moment.</p><button class="btn" id="o3" type="button">Back</button>`);$('o3').onclick=onlineStart;return;}
+  NET={R,code,host,state:'lobby',lastGo:null,day:6,count:12,desk:null,primed:host};
+  const base={name:SV.nick,race:null,at:0,cites:0,done:null};
+  R.presence(host?Object.assign(base,{role:'host',day:NET.day,count:NET.count,seed:0,go:0}):base).catch(()=>{});
+  R.onPeers(()=>netUpdate(),()=>{});
+  netLobby();
+}
+function netHost(){const ps=NET.R.peers().filter(p=>p.presence&&p.presence.role==='host');ps.sort((a,b)=>a.peer<b.peer?-1:1);return ps[0];}
+function netUpdate(){
+  if(!NET)return;const h=netHost();
+  if(h&&!NET.primed){NET.primed=true;NET.lastGo=h.presence.go||0;}
+  if(h&&h.presence.go&&h.presence.go!==NET.lastGo){NET.lastGo=h.presence.go;return netRace(h.presence);}
+  if(NET.state==='lobby')netLobby();else if(NET.state==='race')netStrip();else if(NET.state==='results')netResults();
+}
+function netLobby(){
+  if(!NET)return;const ps=NET.R.peers(),h=netHost();
+  overlay(`<div class="speaker">Race code</div><div class="code">${NET.code}</div><p>Share this code. Everyone needs access to this Claude artifact.</p>
+<div class="list">${ps.map(p=>`<div class="item"><span class="place">${p.presence.role==='host'?'★':'•'}</span><div><b>${esc(p.presence.name||'Someone')}</b>${p.isMe&&p.sameTab?'<small>you</small>':''}</div><span class="small-note">${p.presence.role==='host'?'host':''}</span></div>`).join('')||'<p>Connecting…</p>'}</div>
+${NET.host?`<label>Difficulty</label><div class="chips">${RACE_DAYS.map(([d,l])=>`<button class="chip-day${NET.day===d?' on':''}" type="button" data-d="${d}"><b>${l}</b></button>`).join('')}</div>
+<label>Travelers</label><div class="chips">${[8,12,16,20].map(n=>`<button class="chip-day${NET.count===n?' on':''}" type="button" data-c="${n}"><b>${n}</b></button>`).join('')}</div>
+<button class="btn primary" id="o-start" type="button">Start race for everyone</button>`:`<p>Waiting for ${esc(h?h.presence.name||'the host':'the host')} to start…</p>`}
+<button class="btn" id="o-leave" type="button">Leave race</button>`);
+  const card=$('overlay-card');
+  card.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{NET.day=+b.dataset.d;NET.R.presence({day:NET.day}).catch(()=>{});netLobby();});
+  card.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{NET.count=+b.dataset.c;NET.R.presence({count:NET.count}).catch(()=>{});netLobby();});
+  const st=$('o-start');if(st)st.onclick=()=>{NET.R.presence({seed:rand32(),day:NET.day,count:NET.count,go:Date.now()}).catch(()=>{});};
+  $('o-leave').onclick=netLeave;
+}
+function netRace(hp){
+  NET.state='race';NET.go=hp.go;NET.count=hp.count;
+  NET.R.presence({race:hp.go,at:0,cites:0,done:null}).catch(()=>{});
+  const D=new Desk({mode:'race',online:true,c:BD.makeDay(hp.day,hp.seed),seed:hp.seed+1,count:hp.count,name:SV.nick,onEnd:d=>{
+    NET.R.presence({at:d.count,cites:d.cites,done:Math.round(d.raceTime()*10)/10}).catch(()=>{});NET.state='results';netResults();}});
+  D.hooks.onDecide=()=>NET.R.presence({at:D.processed,cites:D.cites}).catch(()=>{});
+  NET.desk=D;mountSolo(D,0);D.q('.race-strip').hidden=false;netStrip();
+  countdown(()=>D.start());
+}
+function netRacers(){return NET.R.peers().filter(p=>p.presence&&p.presence.race===NET.go);}
+function netStrip(){
+  if(!NET||!NET.desk)return;const el=NET.desk.q('.race-strip');
+  el.innerHTML=netRacers().map(p=>{const pr=p.presence,at=Math.min(+pr.at||0,NET.count);return `<div class="racer${p.isMe&&p.sameTab?' me':''}${pr.done!=null?' done':''}"><span>${esc(pr.name||'Someone')}${p.isMe&&p.sameTab?' (you)':''}</span><div class="bar"><i style="width:${at/NET.count*100}%"></i></div><span>${pr.done!=null?fmtTime(+pr.done):at+'/'+NET.count}</span></div>`;}).join('');
+}
+function netResults(){
+  if(!NET)return;const rs=netRacers().slice().sort((a,b)=>{const x=a.presence.done,y=b.presence.done;if(x!=null&&y!=null)return x-y;if(x!=null)return -1;if(y!=null)return 1;return (b.presence.at||0)-(a.presence.at||0);});
+  overlay(`<h2>Race results</h2><div class="list">${rs.map((p,i)=>{const pr=p.presence;return `<div class="item"><span class="place">${pr.done!=null?i+1:'…'}</span><div><b>${esc(pr.name||'Someone')}</b><small>${p.isMe&&p.sameTab?'you · ':''}${+pr.cites||0} mistakes</small></div><b>${pr.done!=null?fmtTime(+pr.done):'racing '+(+pr.at||0)+'/'+NET.count}</b></div>`;}).join('')}</div>
+<div class="row"><button class="btn primary" id="o-lobby" type="button">Back to lobby</button><button class="btn" id="o-leave" type="button">Leave race</button></div>`);
+  $('o-lobby').onclick=()=>{NET.state='lobby';NET.desk=null;teardown();show('menu');netLobby();};$('o-leave').onclick=netLeave;
+}
+function netLeave(){if(NET){NET.R.leave().catch(()=>{});NET=null;}closeOverlay();teardown();renderMenu();}
+
+/* ================= menu ================= */
+function renderMenu(){
+  show('menu');
+  $('menu-wallet').textContent=`Wallet: ${SV.crowns} crowns`+(Object.keys(SV.upgrades).length?` · ${Object.keys(SV.upgrades).length} tools owned`:'');
+  const sb=$('story-btns');
+  if(SV.story){sb.innerHTML=`<button class="btn primary" id="st-cont" type="button">Continue · Day ${SV.story.day}</button><button class="btn" id="st-new" type="button">Start over</button>`;$('story-meta').textContent=`Day ${SV.story.day} of 10`;}
+  else{sb.innerHTML=`<button class="btn primary" id="st-new" type="button">Start story</button>`;$('story-meta').textContent='10 days';}
+  const cont=$('st-cont');if(cont)cont.onclick=()=>storyDay();
+  $('st-new').onclick=()=>{SV.story={day:1,seed:rand32(),flags:{mercy:0,bribes:0,reported:null,anni:null,mara:false,fennCaught:false},pay:0,cites:0};persist();storyDay();};
+  const max=Math.min(SV.arcadeMax+1,30);let h='';
+  for(let d=1;d<=max;d++){const b=SV.best[d];h+=`<button class="chip-day${b==null?' new':''}" type="button" data-day="${d}"><b>Day ${d}</b><small>${b==null?'new':'best '+b}</small></button>`;}
+  $('arcade-days').innerHTML=h;
+  $('arcade-days').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>startArcade(+b.dataset.day));
+  $('endless-meta').textContent='Best: '+SV.endless+' travelers';
+  $('btn-sound').textContent='Sound: '+(SV.sound?'on':'off');
+}
+function howTo(after){
+  overlay(`<h2>How to play</h2><div class="howto"><ol>
+<li>A traveler steps up and hands over their documents. Read the <b>Rulebook</b> for today's rules.</li>
+<li>Compare every document with the rules, with each other, and with the traveler.</li>
+<li><b>Approve</b> good papers. <b>Deny</b> bad ones. <b>Detain</b> impostors and forgers: wrong face, fake city, fake seal, wrong fingerprint, forged embassy letter.</li>
+<li><b>Ask</b> questions when a rule needs an answer, like length of stay or a fingerprint.</li>
+<li><b>Inspect</b>: tap two things that disagree for a bonus. On a computer you can drag documents by their header and line two up.</li>
+<li>Spend crowns in the <b>Booth shop</b> on tools.</li>
+</ol><p style="margin-top:10px">Keys: <b>A</b> approve, <b>D</b> deny, <b>X</b> detain, <b>I</b> inspect, <b>R</b> rulebook, <b>U</b> UV lamp, <b>Esc</b> pause.</p></div>
+<button class="btn primary" id="ov-ok" type="button">Got it</button>`);
+  $('ov-ok').onclick=()=>{closeOverlay();after&&after();};
+}
+function pause(){
+  if($('game').hidden||!$('overlay').hidden||DESKS.some(d=>d.online)||Coach.steps)return;PAUSED=true;
+  overlay(`<h2>Paused</h2><div class="row"><button class="btn primary" id="o1" type="button">Resume</button><button class="btn" id="o2" type="button">How to play</button><button class="btn" id="o4" type="button">Sound: ${SV.sound?'on':'off'}</button><button class="btn" id="o3" type="button">Quit to menu</button></div>${DESKS[0]&&DESKS[0].mode==='story'?'<p>Quitting restarts this story day next time.</p>':''}`);
+  $('o1').onclick=()=>{closeOverlay();PAUSED=false;};
+  $('o2').onclick=()=>howTo(()=>{PAUSED=false;});
+  $('o4').onclick=e=>{SV.sound=!SV.sound;persist();e.target.textContent='Sound: '+(SV.sound?'on':'off');};
+  $('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};
+}
+
+/* ================= wiring ================= */
+function wire(){
+  $('btn-endless').onclick=startEndless;
+  $('btn-howto').onclick=()=>howTo();
+  $('btn-shop').onclick=()=>openShop();
+  $('btn-tutorial').onclick=()=>runTutorial();
+  $('btn-race-local').onclick=localRaceSetup;
+  $('btn-race-online').onclick=onlineStart;
+  $('btn-sound').onclick=()=>{SV.sound=!SV.sound;persist();renderMenu();};
+  $('book-close').onclick=closeBook;
+  $('book').addEventListener('click',e=>{const k=e.target.closest('[data-key]');const d=DESKS.find(x=>x.layout==='solo');if(k&&d)d.pick(k.dataset.key,k);});
+  document.addEventListener('keydown',e=>{
+    if($('game').hidden||e.metaKey||e.ctrlKey||e.altKey||(e.target&&e.target.matches&&e.target.matches('input')))return;
+    const k=e.key.toLowerCase();
+    if(k==='escape'){if(!$('overlay').hidden&&PAUSED&&$('o1')){$('o1').click();}else pause();return;}
+    if(!$('overlay').hidden)return;
+    for(const d of DESKS){for(const act of ['approve','deny','detain'])if(d.keys[act]===k){e.preventDefault();d.decide(act);return;}}
+    const d=DESKS.length===1?DESKS[0]:null;if(!d||d.layout!=='solo')return;
+    if(k==='i')d.setInspect(!d.inspect);else if(k==='r')$('book').classList.contains('open')?closeBook():openBook();
+    else if(k==='u'&&SV.upgrades.uv)d.setUV(!d.uv);
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&!$('game').hidden&&$('overlay').hidden&&!DESKS.some(d=>d.online||d.mode==='race'&&d.layout==='split'))pause();});
+  let deferred=null;
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('btn-install').hidden=false;});
+  $('btn-install').onclick=()=>{if(deferred){deferred.prompt();deferred=null;$('btn-install').hidden=true;}};
+  let last=performance.now();
+  setInterval(()=>{const now=performance.now(),dt=Math.min(.5,(now-last)/1000);last=now;
+    if(PAUSED||$('game').hidden||!$('overlay').hidden||Coach.steps)return;for(const d of DESKS)d.tick(dt);},100);
+}
+
+/* ================= boot ================= */
+if(IS_IOS&&!IS_STANDALONE){showGate();}
+else{wire();renderMenu();}
+if('serviceWorker' in navigator&&(ON_PAGES||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+window.__BD={get desks(){return DESKS;},SV,Coach,get NET(){return NET;},startArcade};
+})();
+</script>
+</body>
+</html>
