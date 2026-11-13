@@ -1445,15 +1445,30 @@ function passRace(cfg){
 /* ----- online race over the artifact's `room` capability ----- */
 let ROOM=undefined;const roomReady=(async()=>{try{ROOM=window.claude&&window.claude.use?await window.claude.use('room'):null;}catch(e){ROOM=null;}return ROOM;})();
 let NET=null;
+/* GitHub Pages: race rooms over Supabase Realtime presence, shaped like the artifact room API
+   (join -> presence/peers/onPeers/leave) so the race code below works unchanged. No login needed. */
+function supabaseRooms(sb){return{join:async name=>{
+  const me=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));
+  const ch=sb.channel('border-desk-'+name,{config:{presence:{key:me}}});
+  let mine={};const subs=[];
+  const peers=()=>Object.entries(ch.presenceState()).map(([k,arr])=>{const p=Object.assign({},arr[arr.length-1]||{});delete p.presence_ref;return{peer:k,isMe:k===me,sameTab:k===me,presence:p};});
+  ch.on('presence',{event:'sync'},()=>{const ps=peers();subs.forEach(f=>f({peers:ps}));});
+  await new Promise((res,rej)=>{const t=setTimeout(()=>rej(new Error('The race server didn\u2019t answer.')),10000);
+    ch.subscribe(st=>{if(st==='SUBSCRIBED'){clearTimeout(t);res();}else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'){clearTimeout(t);rej(new Error('Couldn\u2019t reach the race server.'));}});});
+  return{presence:async patch=>{for(const k in patch){if(patch[k]===null)delete mine[k];else mine[k]=patch[k];}await ch.track(Object.assign({},mine));},
+    peers,onPeers:f=>{subs.push(f);setTimeout(()=>f({peers:peers()}),0);return()=>{};},
+    leave:async()=>{try{await ch.untrack();}catch(e){}try{await sb.removeChannel(ch);}catch(e){}}};}};}
 function onlineUnavailable(){
-  overlay(`<h2>Online race</h2>${ON_PAGES||!window.claude?`<p>Online races run in the Claude version of Border Desk, which keeps everyone in sync. Open it here and add it to your Home Screen: <a href="${ARTIFACT_URL}" target="_blank" rel="noopener">${ARTIFACT_URL}</a>. The owner has to share it with each player first.</p>`
+  overlay(`<h2>Online race</h2>${!window.claude?'<p>Couldn\u2019t reach the race server. Online races need an internet connection: check yours and try again.</p>'
     :'<p>This view can’t join online races. You need to be signed in to Claude, and the artifact needs to be shared with you.</p>'}<p>You can still race on one device: split screen or pass and play.</p>
 <div class="row"><button class="btn primary" id="o1" type="button">Same-device race</button><button class="btn" id="o3" type="button">Back</button></div>`);
   $('o1').onclick=()=>{closeOverlay();localRaceSetup();};$('o3').onclick=closeOverlay;
 }
 async function onlineStart(){
   if(ROOM===undefined){overlay('<h2>Connecting…</h2>');await roomReady;closeOverlay();}
+  if(!ROOM&&Cloud.kind==='web'){overlay('<h2>Connecting\u2026</h2>');await Cloud.start();closeOverlay();if(Cloud.sb)ROOM=supabaseRooms(Cloud.sb);}
   if(!ROOM)return onlineUnavailable();
+  if(/^Officer \d+$/.test(SV.nick)&&Cloud.user&&Cloud.user.email&&Cloud.user.email.includes('@'))SV.nick=Cloud.user.email.split('@')[0].slice(0,16);
   overlay(`<h2>Online race</h2><label>Your name<input id="nick" maxlength="16" value="${esc(SV.nick)}"></label>
 <button class="btn primary" id="o-create" type="button">Create a race</button>
 <label>Or join with a code<div class="row"><input id="code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase;width:8em"><button class="btn" id="o-join" type="button">Join</button></div></label>
@@ -1480,7 +1495,7 @@ function netUpdate(){
 }
 function netLobby(){
   if(!NET)return;const ps=NET.R.peers(),h=netHost();
-  overlay(`<div class="speaker">Race code</div><div class="code">${NET.code}</div><p>Share this code. Everyone needs access to this Claude artifact.</p>
+  overlay(`<div class="speaker">Race code</div><div class="code">${NET.code}</div><p>${Cloud.kind==='web'?'Share this code. Friends open Border Desk, tap Race \u2192 Online, and join with it.':'Share this code. Everyone needs access to this Claude artifact.'}</p>
 <div class="list">${ps.map(p=>`<div class="item"><span class="place">${p.presence.role==='host'?'★':'•'}</span><div><b>${esc(p.presence.name||'Someone')}</b>${p.isMe&&p.sameTab?'<small>you</small>':''}</div><span class="small-note">${p.presence.role==='host'?'host':''}</span></div>`).join('')||'<p>Connecting…</p>'}</div>
 ${NET.host?`<label>Difficulty</label><div class="chips">${RACE_DAYS.map(([d,l])=>`<button class="chip-day${NET.day===d?' on':''}" type="button" data-d="${d}"><b>${l}</b></button>`).join('')}</div>
 <label>Travelers</label><div class="chips">${[8,12,16,20].map(n=>`<button class="chip-day${NET.count===n?' on':''}" type="button" data-c="${n}"><b>${n}</b></button>`).join('')}</div>
