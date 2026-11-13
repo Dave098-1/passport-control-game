@@ -246,6 +246,19 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 .howto ol{margin:0;padding-left:20px;display:grid;gap:8px;color:var(--text)}
 .choices{display:grid;gap:8px}
 
+/* account screen */
+.acct{justify-self:start;margin-top:6px;color:var(--text)}
+.acc{display:grid;gap:12px}
+.btn.google{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border-color:#dadce0;min-height:46px}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font:600 12px var(--mono);text-transform:uppercase;letter-spacing:.1em}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.acc input{width:100%}
+.acc-err{color:#ff9b8f;font-size:14px}
+.acc-err.ok{color:#8fe0b4}
+.acc-links{justify-content:space-between}
+.linkish{background:none;border:0;padding:4px 0;color:var(--lamp);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.save-pick{display:grid;gap:2px;text-align:left}
+.save-pick small{color:var(--muted);font-weight:400}
 /* coach marks */
 #coach{position:fixed;inset:0;z-index:1000;pointer-events:none}
 .spot{position:fixed;border-radius:12px;box-shadow:0 0 0 9999px rgba(4,9,14,.62);border:2px solid var(--lamp);transition:all .25s ease;pointer-events:none}
@@ -301,6 +314,7 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
       <h1>Border<br>Desk</h1>
       <p>Check the papers. Compare them with today's rules. Approve, deny, or detain the crooks.</p>
       <span class="wallet" id="menu-wallet"></span>
+      <button class="btn small acct" id="btn-account" type="button" hidden>Log in to save across devices</button>
     </div>
     <div class="modes">
       <div class="mode">
@@ -563,7 +577,190 @@ try{Object.assign(SV,JSON.parse(localStorage.getItem(SAVE_KEY))||{});}catch(e){}
 if(SV.seenHow&&!('tutorialDone' in (JSON.parse(localStorage.getItem(SAVE_KEY)||'{}')||{})))SV.tutorialDone=true;
 SV.upgrades=SV.upgrades||{};SV.tips=SV.tips||{};
 if(!SV.nick)SV.nick='Officer '+(10+Math.floor(Math.random()*90));
-function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SV));}catch(e){}}
+function persist(){SV.updatedAt=Date.now();writeLocal();Cloud.changed();}
+
+/* ================= accounts + cross-device saves =================
+   GitHub Pages: Supabase (email + password, Google). Claude artifact: the viewer's Claude account via the db capability.
+   The publishable (anon) key is meant to be public; row-level security limits every player to their own save. */
+const SB_URL='https://gidygwjvmzvlkcmpdmyd.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpZHlnd2p2bXp2bGtjbXBkbXlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODM1MzAsImV4cCI6MjExMDE1OTUzMH0.JjxSPNj2vBI3KCUz-IPm8bJZB1KrXDSv7Izz6VKLkC8';
+const SB_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+const SB_SESSION='sb-gidygwjvmzvlkcmpdmyd-auth-token';
+const DEVICE_KEYS=['sound','cloudUser','updatedAt'];
+const syncable=s=>{const o={};for(const k of Object.keys(s))if(!DEVICE_KEYS.includes(k))o[k]=s[k];return o;};
+const hasProgress=s=>!!(s&&(s.story||s.arcadeMax>0||s.crowns>0||s.endless>0||Object.keys(s.upgrades||{}).length));
+const saveSummary=s=>[s.story?`Story day ${s.story.day}`:'No story yet',`arcade day ${(s.arcadeMax||0)+1}`,`${s.crowns||0} crowns`,`${Object.keys(s.upgrades||{}).length} tools`].join(' · ');
+const ago=t=>{if(!t)return 'not yet';const s=Math.round((Date.now()-t)/1000);return s<60?'just now':s<3600?Math.round(s/60)+' min ago':s<86400?Math.round(s/3600)+' h ago':new Date(t).toLocaleDateString();};
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Could not load the login library. Check your connection.'));document.head.appendChild(s);});}
+
+const Cloud={
+  kind:null,state:'off',user:null,sb:null,adapter:null,lastSync:0,pending:null,pushT:null,started:null,
+  init(){
+    this.kind=window.claude&&window.claude.use?'claude':'web';
+    if(this.kind==='claude'){this.start();return;}
+    const h=location.hash+location.search;let has=false;try{has=!!localStorage.getItem(SB_SESSION);}catch(e){}
+    if(has||/access_token|type=recovery|error_description|[?&]code=/.test(h))this.start();
+  },
+  start(){
+    if(this.started)return this.started;
+    this.state='connecting';
+    return this.started=(this.kind==='claude'?this.startClaude():this.startWeb()).catch(e=>{this.state='error';this.error=e.message||String(e);this.started=null;menuAccount();});
+  },
+  async startClaude(){
+    const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    const id=user&&await user.id();
+    if(!db||!id){this.state='unavailable';menuAccount();return;}
+    const doc=db.doc('data/users/'+id+'/save');
+    this.adapter={
+      load:async()=>{const s=await doc.get();if(!s.exists)return null;const d=s.data();return{save:JSON.parse(d.json),at:+d.at||0};},
+      save:(obj,at)=>doc.set({json:JSON.stringify(obj),at}),
+      del:()=>doc.delete()};
+    this.setUser({id,email:'your Claude account'});
+  },
+  async startWeb(){
+    if(!window.supabase)await loadScript(SB_LIB);
+    const sb=this.sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    this.adapter={
+      load:async()=>{const {data,error}=await sb.from('saves').select('data,updated_at').eq('user_id',this.user.id).maybeSingle();if(error)throw error;return data?{save:data.data,at:Date.parse(data.updated_at)}:null;},
+      save:async(obj,at)=>{const {error}=await sb.from('saves').upsert({user_id:this.user.id,data:obj,updated_at:new Date(at).toISOString()});if(error)throw error;},
+      del:async()=>{const {error}=await sb.from('saves').delete().eq('user_id',this.user.id);if(error)throw error;}};
+    sb.auth.onAuthStateChange((ev,session)=>{
+      if(ev==='PASSWORD_RECOVERY'){setTimeout(()=>accountScreen('newpass'),0);}
+      this.setUser(session&&session.user||null);
+    });
+    const {data}=await sb.auth.getSession();this.setUser(data&&data.session&&data.session.user||null);
+    if(/access_token|type=recovery|[?&]code=/.test(location.hash+location.search))setTimeout(()=>{try{history.replaceState(null,'',location.pathname);}catch(e){}},500);
+  },
+  setUser(u){
+    const was=this.user&&this.user.id;this.user=u;this.state=u?'in':'out';
+    if(u&&u.id!==was)this.reconcile(true);
+    menuAccount();
+  },
+  /* Decide between this device's save and the cloud copy. */
+  async reconcile(fromLogin){
+    if(!this.user||!this.adapter)return;
+    let remote;try{remote=await this.adapter.load();}catch(e){this.error=e.message;menuAccount();return;}
+    const linked=SV.cloudUser===this.user.id;
+    if(!remote){SV.cloudUser=this.user.id;writeLocal();await this.push(true);return;}
+    if(!linked){
+      SV.cloudUser=this.user.id;writeLocal();
+      if(!hasProgress(SV)||JSON.stringify(syncable(SV))===JSON.stringify(remote.save))return this.apply(remote);
+      return this.ask(remote);
+    }
+    if(remote.at>(SV.updatedAt||0))this.apply(remote);
+    else if((SV.updatedAt||0)>remote.at)await this.push(true);
+    else{this.lastSync=Date.now();menuAccount();}
+  },
+  ask(remote){
+    const show=()=>{
+      overlay(`<h2>Which save do you want?</h2><p>This account already has a save, and so does this device. Pick one to keep everywhere.</p>
+<div class="list"><button class="btn save-pick" type="button" id="pick-cloud"><b>Cloud save</b><small>${esc(saveSummary(remote.save))} · saved ${esc(ago(remote.at))}</small></button>
+<button class="btn save-pick" type="button" id="pick-local"><b>This device</b><small>${esc(saveSummary(SV))}</small></button></div>`);
+      $('pick-cloud').onclick=()=>{closeOverlay();this.apply(remote,true);};
+      $('pick-local').onclick=()=>{closeOverlay();SV.updatedAt=Date.now();writeLocal();this.push(true);};
+    };
+    if(!$('game').hidden||!$('overlay').hidden){this.pendingAsk=show;return;}
+    show();
+  },
+  apply(remote,now){
+    if(!now&&!$('game').hidden){this.pending=remote;return;}   // never swap saves mid-shift
+    const keep={};for(const k of DEVICE_KEYS)keep[k]=SV[k];
+    for(const k of Object.keys(SV))if(!DEVICE_KEYS.includes(k))delete SV[k];
+    Object.assign(SV,remote.save,keep,{updatedAt:remote.at});SV.upgrades=SV.upgrades||{};SV.tips=SV.tips||{};
+    writeLocal();this.dirty=false;this.lastSync=Date.now();this.pending=null;
+    if(!$('menu').hidden)renderMenu();
+  },
+  atMenu(){
+    if(this.pending)this.apply(this.pending,true);
+    if(this.pendingAsk&&$('overlay').hidden){const f=this.pendingAsk;this.pendingAsk=null;f();}
+  },
+  changed(){this.dirty=true;if(!this.user)return;clearTimeout(this.pushT);this.pushT=setTimeout(()=>this.push(),2000);},
+  async push(force){
+    clearTimeout(this.pushT);if(!this.user||!this.adapter||!(this.dirty||force))return;
+    try{await this.adapter.save(syncable(SV),SV.updatedAt||Date.now());this.dirty=false;this.lastSync=Date.now();this.error=null;}
+    catch(e){this.error=e.message||'Sync failed';}
+    menuAccount();
+  },
+  async signOut(){if(this.sb)await this.sb.auth.signOut();delete SV.cloudUser;writeLocal();this.setUser(null);}
+};
+function writeLocal(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(SV));}catch(e){}}
+function menuAccount(){
+  const b=$('btn-account');if(!b)return;
+  if(Cloud.kind==='claude'){
+    b.hidden=Cloud.state==='unavailable'||Cloud.state==='off';
+    b.textContent=Cloud.state==='in'?`Saved to your Claude account · synced ${ago(Cloud.lastSync)}`:Cloud.state==='error'?'Cloud save unavailable':'Connecting to your Claude account…';return;}
+  b.hidden=false;
+  b.textContent=Cloud.state==='in'?`${Cloud.user.email||'Signed in'} · ${Cloud.error?'sync failed, tap to retry':'synced '+ago(Cloud.lastSync)}`:Cloud.state==='connecting'?'Connecting…':'Log in to save across devices';
+}
+const GOOGLE_G='<svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>';
+async function accountScreen(view){
+  if(Cloud.kind==='claude'){
+    overlay(`<h2>Your save</h2><p>${Cloud.state==='in'?`Border Desk saves to your Claude account automatically, so your progress follows you to any device where you open it. Last synced ${esc(ago(Cloud.lastSync))}.`:'Your Claude account save isn’t available in this view.'}</p>
+<div class="row">${Cloud.state==='in'?'<button class="btn primary" id="acc-sync" type="button">Sync now</button>':''}<button class="btn" id="acc-x" type="button">Done</button></div>`);
+    const s=$('acc-sync');if(s)s.onclick=async()=>{s.disabled=true;await Cloud.reconcile();accountScreen();};$('acc-x').onclick=closeOverlay;return;
+  }
+  if(!Cloud.sb){overlay('<h2>Connecting…</h2><p>Loading the login page.</p>');await Cloud.start();
+    if(!Cloud.sb){overlay(`<h2>Can’t reach the login server</h2><p>${esc(Cloud.error||'Check your internet connection and try again.')}</p><button class="btn" id="acc-x" type="button">Close</button>`);$('acc-x').onclick=closeOverlay;return;}}
+  if(view==='newpass'){
+    overlay(`<h2>Set a new password</h2><label>New password<input id="acc-pw" type="password" autocomplete="new-password" minlength="8"></label><p class="acc-err" id="acc-err" hidden></p>
+<div class="row"><button class="btn primary" id="acc-go" type="button">Save password</button><button class="btn" id="acc-x" type="button">Cancel</button></div>`);
+    $('acc-go').onclick=async()=>{const pw=$('acc-pw').value;if(pw.length<8)return accErr('Your password needs at least 8 characters.');
+      const {error}=await Cloud.sb.auth.updateUser({password:pw});if(error)return accErr(error.message);overlay('<h2>Password changed</h2><p>You’re logged in.</p><button class="btn primary" id="acc-x" type="button">Play</button>');$('acc-x').onclick=closeOverlay;};
+    $('acc-x').onclick=closeOverlay;return;
+  }
+  if(Cloud.user){
+    overlay(`<h2>Your account</h2><p>Logged in as <b style="color:var(--text)">${esc(Cloud.user.email||'player')}</b>. Your story, crowns, tools and best scores sync to every device you log in on. Last synced ${esc(ago(Cloud.lastSync))}.</p>
+${Cloud.error?`<p class="acc-err">Last sync failed: ${esc(Cloud.error)}</p>`:''}
+<div class="row"><button class="btn primary" id="acc-sync" type="button">Sync now</button><button class="btn" id="acc-out" type="button">Log out</button><button class="btn" id="acc-x" type="button">Done</button></div>
+<button class="btn small" id="acc-del" type="button" style="justify-self:start">Delete my cloud save…</button>`);
+    $('acc-sync').onclick=async e=>{e.target.disabled=true;await Cloud.reconcile();accountScreen();};
+    $('acc-out').onclick=async()=>{await Cloud.signOut();closeOverlay();renderMenu();};
+    $('acc-x').onclick=closeOverlay;
+    $('acc-del').onclick=()=>{overlay('<h2>Delete cloud save?</h2><p>This removes your save from the server. The copy on this device stays.</p><div class="row"><button class="btn primary" id="acc-yes" type="button">Delete cloud save</button><button class="btn" id="acc-no" type="button">Keep it</button></div>');
+      $('acc-yes').onclick=async()=>{try{await Cloud.adapter.del();delete SV.cloudUser;writeLocal();await Cloud.signOut();}catch(e){}closeOverlay();renderMenu();};$('acc-no').onclick=()=>accountScreen();};
+    return;
+  }
+  const signup=view==='signup';
+  overlay(`<div class="acc">
+<h2>${signup?'Create account':'Log in'}</h2><p>Keep your story, crowns and tools on every device. You can always play without an account.</p>
+<button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>Continue with Google</span></button>
+${IS_IOS&&IS_STANDALONE?'<p class="small-note">On iPhone, if Google sign-in finishes in Safari instead of coming back here, use email and password in the app.</p>':''}
+<div class="or"><span>or</span></div>
+<label>Email<input id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"></label>
+<label>Password<input id="acc-pw" type="password" autocomplete="${signup?'new-password':'current-password'}" placeholder="${signup?'At least 8 characters':''}"></label>
+${signup?'<label>Repeat password<input id="acc-pw2" type="password" autocomplete="new-password"></label>':''}
+<p class="acc-err" id="acc-err" hidden></p>
+<button class="btn primary" id="acc-go" type="button">${signup?'Create account':'Log in'}</button>
+<div class="row acc-links">${signup?'<button class="linkish" id="acc-switch" type="button">I already have an account</button>':'<button class="linkish" id="acc-switch" type="button">Create an account</button><button class="linkish" id="acc-forgot" type="button">Forgot password?</button>'}</div>
+<button class="btn" id="acc-x" type="button">Play without an account</button></div>`);
+  $('acc-x').onclick=closeOverlay;
+  $('acc-switch').onclick=()=>accountScreen(signup?'login':'signup');
+  $('acc-google').onclick=async()=>{const {error}=await Cloud.sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]}});if(error)accErr(friendly(error.message));};
+  const f=$('acc-forgot');if(f)f.onclick=async()=>{const email=$('acc-email').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return accErr('Type your email above first, then tap Forgot password.');
+    const {error}=await Cloud.sb.auth.resetPasswordForEmail(email,{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]});if(error)return accErr(friendly(error.message));accErr('Check your email for a link to reset your password.',true);};
+  $('acc-go').onclick=async e=>{
+    const email=$('acc-email').value.trim(),pw=$('acc-pw').value;
+    if(!/^\S+@\S+\.\S+$/.test(email))return accErr('Enter a valid email address.');
+    if(signup&&pw.length<8)return accErr('Your password needs at least 8 characters.');
+    if(signup&&pw!==$('acc-pw2').value)return accErr('The two passwords don’t match.');
+    e.target.disabled=true;
+    const {data,error}=signup?await Cloud.sb.auth.signUp({email,password:pw}):await Cloud.sb.auth.signInWithPassword({email,password:pw});
+    e.target.disabled=false;
+    if(error)return accErr(friendly(error.message));
+    if(signup&&!(data&&data.session))return accErr('Account created. Check your email to confirm it, then log in.',true);
+    closeOverlay();setTimeout(()=>Cloud.atMenu(),0);
+  };
+  setTimeout(()=>{const i=$('acc-email');if(i)i.focus();},50);
+}
+function accErr(msg,good){const el=$('acc-err');if(!el)return;el.hidden=false;el.textContent=msg;el.classList.toggle('ok',!!good);}
+function friendly(m){m=String(m||'');
+  if(/invalid login credentials/i.test(m))return 'Wrong email or password.';
+  if(/already registered|already been registered/i.test(m))return 'That email already has an account. Log in instead.';
+  if(/email not confirmed/i.test(m))return 'Confirm your email first: check your inbox for the link.';
+  if(/provider is not enabled|unsupported provider/i.test(m))return 'Google sign-in isn’t switched on yet. Use email and password for now.';
+  if(/rate limit|too many/i.test(m))return 'Too many tries. Wait a minute and try again.';
+  return m||'Something went wrong. Try again.';}
+
 
 /* ================= audio ================= */
 let AC=null;
@@ -1270,6 +1467,7 @@ function renderMenu(){
   $('arcade-days').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>startArcade(+b.dataset.day));
   $('endless-meta').textContent='Best: '+SV.endless+' travelers';
   $('btn-sound').textContent='Sound: '+(SV.sound?'on':'off');
+  menuAccount();Cloud.atMenu();
 }
 function howTo(after){
   overlay(`<h2>How to play</h2><div class="howto"><ol>
@@ -1300,6 +1498,7 @@ function wire(){
   $('btn-tutorial').onclick=()=>runTutorial();
   $('btn-race-local').onclick=localRaceSetup;
   $('btn-race-online').onclick=onlineStart;
+  $('btn-account').onclick=()=>accountScreen(Cloud.user?undefined:'login');
   $('btn-sound').onclick=()=>{SV.sound=!SV.sound;persist();renderMenu();};
   $('book-close').onclick=closeBook;
   $('book').addEventListener('click',e=>{const k=e.target.closest('[data-key]');const d=DESKS.find(x=>x.layout==='solo');if(k&&d)d.pick(k.dataset.key,k);});
@@ -1313,6 +1512,7 @@ function wire(){
     if(k==='i')d.setInspect(!d.inspect);else if(k==='r')$('book').classList.contains('open')?closeBook():openBook();
     else if(k==='u'&&SV.upgrades.uv)d.setUV(!d.uv);
   });
+  document.addEventListener('visibilitychange',()=>{if(Cloud.user){if(document.hidden)Cloud.push();else if(!$('menu').hidden)Cloud.reconcile();}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&!$('game').hidden&&$('overlay').hidden&&!DESKS.some(d=>d.online||d.mode==='race'&&d.layout==='split'))pause();});
   let deferred=null;
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('btn-install').hidden=false;});
@@ -1323,10 +1523,11 @@ function wire(){
 }
 
 /* ================= boot ================= */
+Cloud.init();
 if(IS_IOS&&!IS_STANDALONE){showGate();}
 else{wire();renderMenu();}
 if('serviceWorker' in navigator&&(ON_PAGES||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(()=>{});}
-window.__BD={get desks(){return DESKS;},SV,Coach,get NET(){return NET;},startArcade};
+window.__BD={get desks(){return DESKS;},SV,Coach,get NET(){return NET;},startArcade,Cloud};
 })();
 </script>
 </body>
