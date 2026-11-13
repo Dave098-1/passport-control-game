@@ -22,6 +22,7 @@ function backend(op, a) {
   calls++;
   if (op === 'signUp') { if (users[a.email]) return { error: 'User already registered' }; users[a.email] = { pw: a.password, id: 'u-' + Object.keys(users).length }; return { user: { id: users[a.email].id, email: a.email } }; }
   if (op === 'signIn') { const u = users[a.email]; if (!u || u.pw !== a.password) return { error: 'Invalid login credentials' }; return { user: { id: u.id, email: a.email } }; }
+  if (op === 'google') { if (!a.token || !a.nonce) return { error: 'missing token or nonce' }; const email = 'g@example.com'; users[email] = users[email] || { pw: null, id: 'u-g' }; return { user: { id: users[email].id, email } }; }
   if (op === 'get') return saves[a.uid] || null;
   if (op === 'put') { saves[a.user_id] = { data: a.data, updated_at: a.updated_at }; return {}; }
   if (op === 'del') { delete saves[a.uid]; return {}; }
@@ -33,6 +34,7 @@ const STUB = `window.supabase={createClient(){
     onAuthStateChange(f){subs.push(f);return{data:{subscription:{unsubscribe(){}}}};},
     signUp:async a=>{const r=await window.__sb('signUp',a);if(r.error)return{data:{},error:{message:r.error}};set({user:r.user},'SIGNED_IN');return{data:{user:r.user,session},error:null};},
     signInWithPassword:async a=>{const r=await window.__sb('signIn',a);if(r.error)return{data:{},error:{message:r.error}};set({user:r.user},'SIGNED_IN');return{data:{user:r.user,session},error:null};},
+    signInWithIdToken:async a=>{const r=await window.__sb('google',a);if(r.error)return{data:{},error:{message:r.error}};window.__idTokenArgs=a;set({user:r.user},'SIGNED_IN');return{data:{user:r.user,session},error:null};},
     signOut:async()=>{set(null,'SIGNED_OUT');return{error:null};},
     signInWithOAuth:async()=>({error:{message:'Unsupported provider: provider is not enabled'}}),
     resetPasswordForEmail:async()=>({error:null}),updateUser:async()=>({error:null})};
@@ -125,6 +127,29 @@ const STUB = `window.supabase={createClient(){
     await fill(page, '#acc-email', 'ana@example.com'); await fill(page, '#acc-pw', 'border-desk-1'); await page.click('#acc-go');
     await page.waitForFunction(() => window.__BD.SV.crowns === 999, null, { timeout: 5000 }).catch(() => {});
     ok((await SV(page)).crowns === 999 && !(await page.isVisible('#pick-cloud')), 'fresh device: cloud save loaded without a question');
+    await ctx.close();
+  }
+  // Google's own pop-up (Google Identity Services) when a Client ID is set.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.exposeFunction('__sb', (op, a) => backend(op, a));
+    await ctx.route('**/supabase.min.js', r => r.fulfill({ contentType: 'text/javascript', body: STUB }));
+    await ctx.route('**/gsi/client', r => r.fulfill({ contentType: 'text/javascript', body: `window.google={accounts:{id:{initialize(o){window.__gsi=o;},renderButton(el,opt){window.__gsiOpt=opt;el.innerHTML='<button id="gsi-btn" type="button">Sign in with Google</button>';el.querySelector('button').onclick=()=>window.__gsi.callback({credential:'header.payload.sig'});}}}};` }));
+    await ctx.addInitScript(() => { window.__TEST_GOOGLE_ID = 'test-client.apps.googleusercontent.com'; localStorage.setItem('borderdesk.v1', JSON.stringify({ tutorialDone: true })); });
+    const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
+    await page.goto(url);
+    await page.click('#btn-account');
+    await page.waitForSelector('#gsi-btn');
+    ok(!(await page.isVisible('#acc-google')) && await page.isVisible('#acc-google-alt'), 'google pop-up: Google\u2019s own button replaces the redirect button, with a fallback link');
+    ok(await page.evaluate(() => window.__gsi.client_id === 'test-client.apps.googleusercontent.com' && window.__gsiOpt.theme === 'filled_black'), 'google pop-up: set up with the Client ID and a black button');
+    await page.click('#gsi-btn');
+    await page.waitForFunction(() => window.__BD.Cloud.user && window.__BD.Cloud.user.email === 'g@example.com', null, { timeout: 5000 }).catch(() => {});
+    const args = await page.evaluate(() => window.__idTokenArgs);
+    const hashed = await page.evaluate(() => window.__gsi.nonce);
+    const crypto = require('crypto');
+    ok(args && args.provider === 'google' && args.token === 'header.payload.sig' && crypto.createHash('sha256').update(args.nonce).digest('hex') === hashed, 'google pop-up: token passed to Supabase with a matching nonce');
+    ok(await page.isHidden('#overlay') && /g@example\.com/.test(await page.textContent('#btn-account')), 'google pop-up: signed in and login screen closed');
+    ok(errs.length === 0, 'google pop-up: no errors ' + errs.join(' | '));
     await ctx.close();
   }
   // Claude artifact version: saves to the viewer's Claude account through a stand-in db.
