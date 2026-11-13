@@ -262,6 +262,8 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 /* account screen (light card, matches the requested login design) */
 .card.acc-light{background:#fff;color:#1f1f1f;border-color:#e6e6e6;max-width:430px;padding:40px 26px 26px;font-family:"Outfit",var(--sans);position:relative}
 .acc-light .acc{gap:14px}
+.gsi-slot{display:flex;justify-content:center;min-height:44px}
+.acc-light .small-alt{font-size:13px;color:#777;justify-self:center}
 .acc-close{position:absolute;top:10px;right:12px;width:36px;height:36px;border:0;background:none;color:#8a8a8a;font-size:26px;line-height:1;border-radius:50%}
 .acc-light .btn.google{display:flex;align-items:center;justify-content:center;gap:10px;background:#1c1c1c;color:#fff;border:0;border-radius:14px;min-height:56px;font:500 18px "Outfit",var(--sans)}
 .acc-light .or{display:flex;align-items:center;gap:16px;color:#555;font:400 16px "Outfit",var(--sans);text-transform:none;letter-spacing:0;margin:8px 0}
@@ -606,6 +608,22 @@ const SB_URL='https://gidygwjvmzvlkcmpdmyd.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpZHlnd2p2bXp2bGtjbXBkbXlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1ODM1MzAsImV4cCI6MjExMDE1OTUzMH0.JjxSPNj2vBI3KCUz-IPm8bJZB1KrXDSv7Izz6VKLkC8';
 const SB_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
 const SB_SESSION='sb-gidygwjvmzvlkcmpdmyd-auth-token';
+/* Google's own sign-in pop-up (shows "Border Desk" instead of the Supabase address).
+   Paste the Web OAuth Client ID here (public; never the client secret). Empty = use the redirect sign-in. */
+const GOOGLE_CLIENT_ID=window.__TEST_GOOGLE_ID||'862157398756-8cns40bes4piahbofscdm5dol0lmnd0c.apps.googleusercontent.com';
+const GSI_LIB='https://accounts.google.com/gsi/client';
+async function sha256hex(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+async function setupGoogleButton(signup){
+  const slot=$('acc-gsi'),fallback=$('acc-google');if(!slot||!GOOGLE_CLIENT_ID||Cloud.kind!=='web'||!window.crypto||!crypto.subtle)return;
+  try{if(!(window.google&&google.accounts&&google.accounts.id))await loadScript(GSI_LIB);}catch(e){return;}
+  if(!$('acc-gsi'))return;
+  const raw=[...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,nonce:await sha256hex(raw),ux_mode:'popup',itp_support:true,
+    callback:async r=>{const {error}=await Cloud.sb.auth.signInWithIdToken({provider:'google',token:r.credential,nonce:raw});
+      if(error)return accErr(friendly(error.message));closeOverlay();setTimeout(()=>Cloud.atMenu(),0);}});
+  google.accounts.id.renderButton(slot,{type:'standard',theme:'filled_black',size:'large',shape:'rectangular',text:signup?'signup_with':'signin_with',logo_alignment:'center',width:Math.min(400,Math.max(200,slot.clientWidth||fallback.clientWidth))});
+  slot.hidden=false;fallback.hidden=true;$('acc-google-alt').hidden=false;
+}
 const DEVICE_KEYS=['sound','cloudUser','updatedAt'];
 const syncable=s=>{const o={};for(const k of Object.keys(s))if(!DEVICE_KEYS.includes(k))o[k]=s[k];return o;};
 const hasProgress=s=>!!(s&&(s.story||s.arcadeMax>0||s.crowns>0||s.endless>0||Object.keys(s.upgrades||{}).length));
@@ -745,7 +763,9 @@ ${Cloud.error?`<p class="acc-err">Last sync failed: ${esc(Cloud.error)}</p>`:''}
   const LOCK='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></svg>';
   overlay(`<div class="acc">
 <button class="acc-close" id="acc-x" type="button" aria-label="Close and play without an account">\u00d7</button>
+<div class="gsi-slot" id="acc-gsi" hidden></div>
 <button class="btn google" id="acc-google" type="button">${GOOGLE_G}<span>${signup?'Sign up':'Login'} with Google</span></button>
+<button class="linkish dark small-alt" id="acc-google-alt" type="button" hidden>Google pop-up not opening? Try the other way</button>
 ${IS_IOS&&IS_STANDALONE?'<p class="acc-note">On iPhone, if Google finishes in Safari instead of coming back here, use email and password in the app.</p>':''}
 <div class="or"><span>or</span></div>
 <label class="field">${MAIL}<input id="acc-email" type="email" autocomplete="email" inputmode="email" placeholder="Your Email" aria-label="Your email"></label>
@@ -758,6 +778,8 @@ ${signup?'':'<button class="linkish dark" id="acc-forgot" type="button">Forgot p
 <p class="acc-note">Playing without an account is fine. An account keeps your progress on every device.</p></div>`,'acc-light');
   $('acc-x').onclick=closeOverlay;
   $('acc-switch').onclick=()=>accountScreen(signup?'login':'signup');
+  setupGoogleButton(signup);
+  $('acc-google-alt').onclick=()=>$('acc-google').click();
   $('acc-google').onclick=async()=>{const {error}=await Cloud.sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]}});if(error)accErr(friendly(error.message));};
   const f=$('acc-forgot');if(f)f.onclick=async()=>{const email=$('acc-email').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return accErr('Type your email above first, then tap Forgot password.');
     const {error}=await Cloud.sb.auth.resetPasswordForEmail(email,{redirectTo:ON_PAGES?PAGES_URL:location.href.split('#')[0]});if(error)return accErr(friendly(error.message));accErr('Check your email for a link to reset your password.',true);};
