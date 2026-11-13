@@ -1,3 +1,77 @@
+# Settings: "Stamp it yourself" (manual stamping for satisfaction)
+
+## Context
+Today, pressing Approve, Deny or Detain decides instantly, and a big stamp graphic flashes in the middle of the screen. The user wants an option in Settings to stamp the papers by hand, because it's more satisfying. The game has no Settings screen yet, only a "Sound" button in the menu and in the pause screen, so this adds one.
+
+## 1. Settings screen
+- The menu's **Sound** button becomes **Settings**. The pause screen also gets a **Settings** button.
+- The Settings overlay is in the same style as the shop:
+  - **Sound:** on/off, as now.
+  - **Stamp it yourself:** off by default. "Tap Approve, Deny or Detain to pick up the stamp, then tap the passport to stamp it."
+- Settings are saved in `SV.manualStamp`, next to `SV.sound`. They're stored like other saves, so they sync with an account, except sound, which already stays per device.
+
+## 2. How manual stamping works (the `Desk` class in `index.html`)
+- **Picking up the stamp:** with the setting on, tapping a stamp button calls `hold(kind)` instead of deciding.
+  - The button stays pressed in.
+  - A hint bar on the desk says "Tap the passport to stamp ENTRY GRANTED".
+  - The passport gets a glowing outline.
+  - On phones, the document row scrolls back to the passport.
+  - On desktop, a small ghost stamp follows the mouse.
+  - Tapping the same button again puts the stamp down; tapping another button swaps stamps.
+  - Inspect mode turns off while holding a stamp.
+- **Stamping the passport:** a tap anywhere on the passport leaves an **ink imprint** where you tapped:
+  - "ENTRY GRANTED" in green, "ENTRY DENIED" in red, "DETAINED" in purple, slightly rotated and with a rough ink texture;
+  - a quick press-down animation, the stamp thunk sound, and a short vibration on Android (iPhone doesn't allow it).
+  - About 0.25 s later the existing `decide(kind)` runs as normal: scoring, toast, next traveler.
+  - The big centre stamp is skipped, because the imprint replaces it.
+  - The imprint stays on the passport until the next traveler.
+- **Keyboard** (A/D/X, and arrows for player 2): stamps straight onto the middle of the passport with the same imprint, so keyboard play stays quick.
+- **Where it applies:** Story, Arcade, Endless and races (each split-screen half on its own).
+  - The tutorial always uses instant stamping, so its steps stay simple.
+- Works with dragged papers on desktop, because the imprint sits inside the passport, and in a power cut or blizzard.
+
+## 3. Files
+- `index.html`: Settings overlay and menu/pause buttons; `Desk.hold()`, the imprint, the hint bar and the ghost stamp; a small change to `decide()` so it can skip the centre stamp; CSS for the imprint, the glowing passport and the held button.
+- `sw.js`: version bump.
+- `tests/e2e.js`: a manual-stamp test.
+- `README.md`: a line about Settings.
+
+## Verification
+- **New browser test:**
+  - turn the setting on;
+  - start Arcade day 1, tap Approve, and check no decision has happened yet and the hint shows;
+  - tap the passport, and check an imprint appears at that spot and the decision counts;
+  - press `D`, and check the imprint and decision happen straight away;
+  - turn the setting off, and check stamping is instant again.
+- **Existing tests:** all existing suites pass (manual mode is off by default).
+- **Screenshot:** a stamped passport on a phone.
+- **Delivery:** push to the branch. If PR #8 is still open this joins it; otherwise a new PR.
+
+# Fix: game header hidden under the iPhone status bar (before merging PR #8)
+
+## Context
+In the iPhone Home Screen app, the top row of the game screen sits behind the clock, Dynamic Island and battery. That row holds pause, the day, the date, the timer and the score. The user's screenshot starts straight at the traveler booth.
+
+**Cause** (`index.html`):
+- `.screen` (line 48) adds `padding-top: env(safe-area-inset-top)`, which keeps content clear of the status bar.
+- `#game{padding:8px …}` (line 99) is a padding shorthand with an id selector, so it overrides that top and bottom safe-area padding.
+- The menu doesn't have this problem, because it only sets left and right padding.
+
+## Change
+1. In `index.html`, line 99 becomes
+   `#game{padding:calc(env(safe-area-inset-top,0px) + 8px) var(--gutter-r) calc(env(safe-area-inset-bottom,0px) + 8px) var(--gutter-l)}`.
+   The header then starts below the status bar and the stamp buttons stay above the home bar.
+2. Check other full-screen layers for the same override, and give them the same treatment if needed:
+   - the overlay already uses `max(16px, env(...))`;
+   - the coach marks use viewport coordinates;
+   - the toast and stamp sit inside the desk.
+3. Bump `VERSION` in `sw.js`, then commit and push to the same branch, so **PR #8** picks it up before it's merged.
+
+## Verification
+- **Inset can't be faked here:** Playwright can't reproduce the iPhone's real notch inset.
+- **What I can check:** a small check that `#game`'s computed padding still works on a normal screen, and the full test suites still pass.
+- **What the user checks:** after merging, the header with day, date, timer and score is fully visible below the clock in the Home Screen app.
+
 # Story Chapter 2: days 11–20, a new rule every day
 
 ## Context

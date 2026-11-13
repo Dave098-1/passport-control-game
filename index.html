@@ -219,6 +219,22 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
 .poster svg{width:100%;height:auto;background:#c9d3d8;border-radius:4px}
 .desk.dark.snow .doc:not(.lit){filter:blur(5px) brightness(1.15) saturate(.4)}
 .desk.snow{background:repeating-linear-gradient(90deg,#4a4d55 0 2px,#545862 2px 7px)}
+/* manual stamping */
+.stamp-hint{position:absolute;left:0;right:0;top:0;z-index:551;padding:8px 12px;font:600 13px var(--sans);color:#fff;text-align:center;pointer-events:none;border-radius:14px 14px 0 0;opacity:.95}
+.stamp-hint.ok{background:var(--approve)}.stamp-hint.no{background:var(--deny)}.stamp-hint.det{background:var(--detain)}
+.act.held{outline:3px solid var(--lamp);outline-offset:2px;transform:translateY(2px);box-shadow:inset 0 4px 0 rgba(0,0,0,.25)}
+.docs:not(.free) .doc.passport{position:relative}
+.holding .doc.passport{box-shadow:0 0 0 3px var(--lamp),0 0 26px rgba(233,180,76,.55);cursor:crosshair;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 3px var(--lamp),0 0 8px rgba(233,180,76,.3)}}
+.imprint{position:absolute;z-index:5;transform:translate(-50%,-50%) rotate(var(--r));padding:6px 12px;border:4px double currentColor;border-radius:8px;
+  font:800 26px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;opacity:.82;mix-blend-mode:multiply;pointer-events:none;
+  -webkit-mask-image:repeating-radial-gradient(circle at 30% 40%,#000 0 2px,rgba(0,0,0,.55) 3px 4px);mask-image:repeating-radial-gradient(circle at 30% 40%,#000 0 2px,rgba(0,0,0,.55) 3px 4px);
+  animation:press .22s cubic-bezier(.2,1.5,.4,1)}
+.imprint.ok{color:#1f7a4a}.imprint.no{color:#b3261e}.imprint.det{color:#6a3fae}
+@keyframes press{from{transform:translate(-50%,-50%) rotate(var(--r)) scale(1.7);opacity:0}}
+.ghost-stamp{position:fixed;z-index:720;pointer-events:none;transform:translate(-50%,-115%) rotate(-8deg);padding:4px 10px;border:3px solid currentColor;border-radius:8px;
+  font:800 18px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;background:rgba(243,238,223,.9)}
+.ghost-stamp.ok{color:var(--approve)}.ghost-stamp.no{color:var(--deny)}.ghost-stamp.det{color:var(--detain)}
 /* inspect mode */
 .inspecting .f{cursor:pointer;border-color:rgba(90,163,214,.55)}
 .f.sel{border-color:var(--info)!important;border-style:solid!important;box-shadow:0 0 0 3px rgba(90,163,214,.45)}
@@ -379,7 +395,7 @@ kbd{font:600 10px var(--mono);opacity:.7;margin-left:6px;border:1px solid curren
       <button class="btn" id="btn-shop" type="button">Booth shop</button>
       <button class="btn" id="btn-tutorial" type="button">Tutorial</button>
       <button class="btn" id="btn-howto" type="button">How to play</button>
-      <button class="btn" id="btn-sound" type="button">Sound: on</button>
+      <button class="btn" id="btn-settings" type="button">Settings</button>
       <button class="btn" id="btn-install" type="button" hidden>Install app</button>
     </div>
   </div>
@@ -1115,6 +1131,7 @@ const DESK_HTML=d=>`
   </section>
   <section class="desk" aria-label="Documents">
     <div class="inspect-bar" hidden>Inspect: tap two things that don't agree.</div>
+    <div class="stamp-hint" hidden></div>
     <div class="docs"></div>
     <div class="desk-tools"><button class="btn small lineup" type="button" hidden>Line up</button></div>
   </section>
@@ -1128,8 +1145,10 @@ const DESK_HTML=d=>`
   </div>
 </footer>
 <div class="stamp" hidden></div>
-<div class="toast" role="status" hidden></div>`;
+<div class="toast" role="status" hidden></div>
+<div class="ghost-stamp" hidden></div>`;
 
+const STAMP_TEXT={approve:'Entry granted',deny:'Entry denied',detain:'Detained'},STAMP_CLS={approve:'ok',deny:'no',detain:'det'};
 const KEYS={solo:{approve:'a',deny:'d',detain:'x'},p1:{approve:'a',deny:'d',detain:'x'},p2:{approve:'arrowright',deny:'arrowleft',detain:'arrowdown'}};
 const KEYLABEL={solo:{approve:'A',deny:'D',detain:'X'},p1:{approve:'A',deny:'D',detain:'X'},p2:{approve:'→',deny:'←',detain:'↓'}};
 
@@ -1143,7 +1162,12 @@ class Desk{
     if(this.mode==='endless'&&SV.upgrades.charm)this.maxMistakes=4;
     const el=this.el=document.createElement('div');el.className='desk-root '+this.layout;el.innerHTML=DESK_HTML(this);
     const on=(sel,fn)=>{const b=this.q(sel);if(b)b.addEventListener('click',fn);};
-    on('.approve',()=>this.decide('approve'));on('.deny',()=>this.decide('deny'));on('.detain',()=>this.decide('detain'));
+    on('.approve',()=>this.press('approve'));on('.deny',()=>this.press('deny'));on('.detain',()=>this.press('detain'));
+    // manual stamping: a tap on the passport while holding a stamp leaves an imprint there
+    el.addEventListener('pointerdown',e=>{if(!this.held)return;const pp=e.target.closest('.doc.passport');if(!pp||!el.contains(pp))return;
+      e.preventDefault();e.stopPropagation();const r=pp.getBoundingClientRect();this.stampAt(this.held,e.clientX-r.left,e.clientY-r.top);},true);
+    el.addEventListener('pointermove',e=>{const g=this.q('.ghost-stamp');if(!this.held||e.pointerType!=='mouse'){g.hidden=true;return;}
+      g.hidden=false;g.style.left=e.clientX+'px';g.style.top=e.clientY+'px';});
     on('.act-inspect',()=>this.setInspect(!this.inspect));
     on('.act-book',()=>$('book').classList.contains('open')?closeBook():openBook());
     on('.act-uv',()=>this.setUV(!this.uv));
@@ -1163,7 +1187,7 @@ class Desk{
     return this.idx>=this.queue.length;
   }
   next(){
-    this.sel=[];this.hl();
+    this.sel=[];this.hl();if(this.held)this.drop();
     if(this.isOver())return this.finish();
     let t;const c=this.c;
     if(this.mode==='tutorial'){t=this.queue[this.idx++](this);}
@@ -1288,16 +1312,45 @@ class Desk{
     setTimeout(()=>{this.sel=[];this.hl();},700);
   }
   toast(msg,kind){const el=this.q('.toast');el.textContent=msg;el.className='toast '+kind;el.hidden=false;clearTimeout(this._tt);this._tt=setTimeout(()=>el.hidden=true,1900);}
-  decide(kind){
+  manual(){return !!SV.manualStamp&&this.mode!=='tutorial';}
+  press(kind){
+    if(!this.manual())return this.decide(kind);
     if(this.busy||!this.t||this.done||PAUSED||!$('overlay').hidden)return;
+    if(this.held===kind)return this.drop();
+    this.hold(kind);
+  }
+  hold(kind){
+    this.setInspect(false);this.held=kind;this.el.classList.add('holding');
+    ['approve','deny','detain'].forEach(k=>this.q('.'+k).classList.toggle('held',k===kind));
+    const h=this.q('.stamp-hint');h.hidden=false;h.textContent='Tap the passport to stamp '+STAMP_TEXT[kind].toUpperCase();h.className='stamp-hint '+STAMP_CLS[kind];
+    const g=this.q('.ghost-stamp');g.textContent=STAMP_TEXT[kind];g.className='ghost-stamp '+STAMP_CLS[kind];g.hidden=true;
+    this.q('.docs').scrollLeft=0;this.q('.desk').scrollTop=0;
+  }
+  drop(){this.held=null;this.el.classList.remove('holding');['approve','deny','detain'].forEach(k=>this.q('.'+k).classList.remove('held'));this.q('.stamp-hint').hidden=true;this.q('.ghost-stamp').hidden=true;}
+  stampAt(kind,x,y){
+    if(this.busy||!this.t||this.done||PAUSED||!$('overlay').hidden)return;
+    const pp=this.q('.doc.passport');if(!pp)return this.decide(kind);
+    this.busy=true;this.drop();
+    const rot=(Math.random()*24-12).toFixed(1);
+    pp.insertAdjacentHTML('beforeend',`<div class="imprint ${STAMP_CLS[kind]}" style="left:${Math.round(x)}px;top:${Math.round(y)}px;--r:${rot}deg">${STAMP_TEXT[kind]}</div>`);
+    sound('stamp');try{if(navigator.vibrate)navigator.vibrate(35);}catch(e){}
+    setTimeout(()=>this.decide(kind,true),250);
+  }
+  keyStamp(kind){
+    if(!this.manual())return this.decide(kind);
+    const pp=this.q('.doc.passport');if(!pp)return this.decide(kind);
+    const r=pp.getBoundingClientRect();this.stampAt(kind,r.width*(.3+Math.random()*.4),r.height*(.35+Math.random()*.35));
+  }
+  decide(kind,manual){
+    if((this.busy&&!manual)||!this.t||this.done||PAUSED||!$('overlay').hidden)return;
     this.busy=true;this.setInspect(false);if(this.layout==='solo')closeBook();
     const t=this.t,valid=!t.issues.length,story=this.mode==='story',ev=this.c.event;
     let ok,msg;
     if(kind==='approve'){ok=valid;msg=ok?'Correct. Welcome to Veldmark.':'Citation: '+t.issues[0].text;}
     else if(kind==='deny'){ok=!valid;msg=ok?'Correct. '+t.issues[0].text+(t.crime?' (Detain would have earned more.)':''):'Citation: their papers were in order.';}
     else{ok=t.crime;msg=ok?'Detained. '+t.issues.find(x=>x.crime).text:valid?'Citation: you detained someone with good papers.':'Citation: wrongful detention. '+t.issues[0].text+' That’s a deny, not a crime.';}
-    const st=this.q('.stamp');st.textContent={approve:'Entry granted',deny:'Entry denied',detain:'Detained'}[kind];st.className='stamp '+{approve:'ok',deny:'no',detain:'det'}[kind];st.hidden=false;
-    sound('stamp');setTimeout(()=>{st.hidden=true;},450);
+    if(!manual){const st=this.q('.stamp');st.textContent={approve:'Entry granted',deny:'Entry denied',detain:'Detained'}[kind];st.className='stamp '+{approve:'ok',deny:'no',detain:'det'}[kind];st.hidden=false;
+    sound('stamp');setTimeout(()=>{st.hidden=true;},450);}
     if(t.spec&&t.spec.decide)t.spec.decide(kind,SV.story.flags);
     this.processed++;
     if(!ok&&SV.upgrades.charm&&!this.luckUsed&&(this.mode==='arcade'||this.mode==='story')){this.luckUsed=true;ok=null;msg='Lucky charm: that citation is forgiven.';}
@@ -1660,7 +1713,6 @@ function renderMenu(){
   $('arcade-days').innerHTML=h;
   $('arcade-days').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>startArcade(+b.dataset.day));
   $('endless-meta').textContent='Best: '+SV.endless+' travelers';
-  $('btn-sound').textContent='Sound: '+(SV.sound?'on':'off');
   menuAccount();Cloud.atMenu();
 }
 function howTo(after){
@@ -1675,12 +1727,24 @@ function howTo(after){
 <button class="btn primary" id="ov-ok" type="button">Got it</button>`);
   $('ov-ok').onclick=()=>{closeOverlay();after&&after();};
 }
+function openSettings(after){
+  const draw=()=>{
+    overlay(`<h2>Settings</h2><div class="list">
+<div class="shop-item"><div><b>Sound</b><small>Stamps, buzzers and the race countdown.</small></div><button class="btn small${SV.sound?' primary':''}" id="set-sound" type="button" aria-pressed="${!!SV.sound}">${SV.sound?'On':'Off'}</button></div>
+<div class="shop-item"><div><b>Stamp it yourself</b><small>Tap Approve, Deny or Detain to pick up the stamp, then tap the passport to stamp it. Keyboard keys stamp straight away.</small></div><button class="btn small${SV.manualStamp?' primary':''}" id="set-stamp" type="button" aria-pressed="${!!SV.manualStamp}">${SV.manualStamp?'On':'Off'}</button></div>
+</div><button class="btn" id="set-done" type="button">Done</button>`);
+    $('set-sound').onclick=()=>{SV.sound=!SV.sound;persist();draw();};
+    $('set-stamp').onclick=()=>{SV.manualStamp=!SV.manualStamp;persist();draw();};
+    $('set-done').onclick=()=>{closeOverlay();after&&after();};
+  };
+  draw();
+}
 function pause(){
   if($('game').hidden||!$('overlay').hidden||DESKS.some(d=>d.online)||Coach.steps)return;PAUSED=true;
-  overlay(`<h2>Paused</h2><div class="row"><button class="btn primary" id="o1" type="button">Resume</button><button class="btn" id="o2" type="button">How to play</button><button class="btn" id="o4" type="button">Sound: ${SV.sound?'on':'off'}</button><button class="btn" id="o3" type="button">Quit to menu</button></div>${DESKS[0]&&DESKS[0].mode==='story'?'<p>Quitting restarts this story day next time.</p>':''}`);
+  overlay(`<h2>Paused</h2><div class="row"><button class="btn primary" id="o1" type="button">Resume</button><button class="btn" id="o2" type="button">How to play</button><button class="btn" id="o4" type="button">Settings</button><button class="btn" id="o3" type="button">Quit to menu</button></div>${DESKS[0]&&DESKS[0].mode==='story'?'<p>Quitting restarts this story day next time.</p>':''}`);
   $('o1').onclick=()=>{closeOverlay();PAUSED=false;};
   $('o2').onclick=()=>howTo(()=>{PAUSED=false;});
-  $('o4').onclick=e=>{SV.sound=!SV.sound;persist();e.target.textContent='Sound: '+(SV.sound?'on':'off');};
+  $('o4').onclick=()=>{closeOverlay();openSettings(()=>{PAUSED=false;pause();});};
   $('o3').onclick=()=>{closeOverlay();teardown();renderMenu();};
 }
 
@@ -1693,7 +1757,7 @@ function wire(){
   $('btn-race-local').onclick=localRaceSetup;
   $('btn-race-online').onclick=onlineStart;
   $('btn-account').onclick=()=>accountScreen(Cloud.user?undefined:'login');
-  $('btn-sound').onclick=()=>{SV.sound=!SV.sound;persist();renderMenu();};
+  $('btn-settings').onclick=()=>openSettings(renderMenu);
   $('book-close').onclick=closeBook;
   $('book').addEventListener('click',e=>{const k=e.target.closest('[data-key]');const d=DESKS.find(x=>x.layout==='solo');if(k&&d)d.pick(k.dataset.key,k);});
   document.addEventListener('keydown',e=>{
@@ -1701,7 +1765,7 @@ function wire(){
     const k=e.key.toLowerCase();
     if(k==='escape'){if(!$('overlay').hidden&&PAUSED&&$('o1')){$('o1').click();}else pause();return;}
     if(!$('overlay').hidden)return;
-    for(const d of DESKS){for(const act of ['approve','deny','detain'])if(d.keys[act]===k){e.preventDefault();d.decide(act);return;}}
+    for(const d of DESKS){for(const act of ['approve','deny','detain'])if(d.keys[act]===k){e.preventDefault();d.keyStamp(act);return;}}
     const d=DESKS.length===1?DESKS[0]:null;if(!d||d.layout!=='solo')return;
     if(k==='i')d.setInspect(!d.inspect);else if(k==='r')$('book').classList.contains('open')?closeBook():openBook();
     else if(k==='u'&&SV.upgrades.uv)d.setUV(!d.uv);
