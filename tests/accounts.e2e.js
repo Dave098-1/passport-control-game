@@ -134,15 +134,18 @@ const STUB = `window.supabase={createClient(){
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     await ctx.exposeFunction('__sb', (op, a) => backend(op, a));
     await ctx.route('**/supabase.min.js', r => r.fulfill({ contentType: 'text/javascript', body: STUB }));
-    await ctx.route('**/gsi/client', r => r.fulfill({ contentType: 'text/javascript', body: `window.google={accounts:{id:{initialize(o){window.__gsi=o;},renderButton(el,opt){window.__gsiOpt=opt;el.innerHTML='<button id="gsi-btn" type="button">Sign in with Google</button>';el.querySelector('button').onclick=()=>window.__gsi.callback({credential:'header.payload.sig'});}}}};` }));
+    await ctx.route('**/gsi/client', r => r.fulfill({ contentType: 'text/javascript', body: `window.google={accounts:{id:{initialize(o){window.__gsi=o;},renderButton(el,opt){window.__gsiOpt=opt;el.innerHTML='<div><button id="gsi-btn" type="button" style="width:'+opt.width+'px;height:40px;display:block">Sign in with Google</button></div>';el.querySelector('button').onclick=()=>window.__gsi.callback({credential:'header.payload.sig'});}}}};` }));
     await ctx.addInitScript(() => { window.__TEST_GOOGLE_ID = 'test-client.apps.googleusercontent.com'; localStorage.setItem('borderdesk.v1', JSON.stringify({ tutorialDone: true })); });
     const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
     await page.goto(url);
     await page.click('#btn-account');
     await page.waitForSelector('#gsi-btn');
-    ok(!(await page.isVisible('#acc-google')) && await page.isVisible('#acc-google-alt'), 'google pop-up: Google\u2019s own button replaces the redirect button, with a fallback link');
+    ok(await page.isVisible('#acc-google') && /Login with Google/.test(await page.textContent('#acc-google')) && await page.isVisible('#acc-google-alt'), 'google pop-up: the designed black button is shown, with a fallback link');
+    const cover = await page.evaluate(() => { const b = document.getElementById('acc-google').getBoundingClientRect(), g = document.querySelector('#acc-gsi > *').getBoundingClientRect(); return { op: +getComputedStyle(document.getElementById('acc-gsi')).opacity, dx: Math.abs(b.width - g.width) + Math.abs(b.height - g.height) + Math.abs(b.left - g.left) + Math.abs(b.top - g.top) }; });
+    ok(cover.op < 0.05 && cover.dx < 3, 'google pop-up: Google\u2019s button is invisible and covers the designed button exactly ' + JSON.stringify(cover));
     ok(await page.evaluate(() => window.__gsi.client_id === 'test-client.apps.googleusercontent.com' && window.__gsiOpt.theme === 'filled_black'), 'google pop-up: set up with the Client ID and a black button');
-    await page.click('#gsi-btn');
+    const c = await page.locator('#acc-google').boundingBox();
+    await page.mouse.click(c.x + c.width * 0.9, c.y + c.height * 0.85); // tap near the corner of the designed button
     await page.waitForFunction(() => window.__BD.Cloud.user && window.__BD.Cloud.user.email === 'g@example.com', null, { timeout: 5000 }).catch(() => {});
     const args = await page.evaluate(() => window.__idTokenArgs);
     const hashed = await page.evaluate(() => window.__gsi.nonce);
